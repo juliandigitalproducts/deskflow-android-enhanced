@@ -26,8 +26,6 @@
 
 pluginManagement {
   repositories {
-    maven { setUrl("https://jitpack.io") }
-
     google {
       content {
         includeGroupByRegex("com\\.android.*")
@@ -44,12 +42,11 @@ pluginManagement {
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
   repositories {
-    maven { setUrl("https://jitpack.io") }
     google()
     mavenCentral()
   }
 }
 
-rootProject.name = "DeskflowAndroid"
+rootProject.name = "Deskflow-Android-Enhanced"
 
-include(":client", ":client-cli", ":iconics-typeface-library", ":app")
+include(":client", ":app")

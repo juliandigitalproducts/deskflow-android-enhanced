@@ -1,44 +1,48 @@
 /*
- * MIT License
+ * deskflow -- mouse and keyboard sharing utility
+ * Copyright (C) 2010 Shaun Patterson
+ * Copyright (C) 2010 The Deskflow Project
+ * Copyright (C) 2009 The Deskflow+ Project
+ * Copyright (C) 2002 Chris Schoeneman
+ * Copyright (C) 2025 Jonathan Glanz
+ * Copyright (C) 2026 juliandigitalproducts
+ * 
+ * This package is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2, found in the file COPYING that should have accompanied this file.
+ * 
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * Copyright (c) 2025 Jonathan Glanz
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.tfv.deskflow.client.io.msgs
 
-import org.tfv.deskflow.client.io.readString
 import org.tfv.deskflow.client.io.writeString
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.net.Inet4Address
 
 class HelloBackMessage(// Protocol version and screen name
     var majorVersion: Int = 0,
     var minorVersion: Int = 0,
-    var name: String = Inet4Address.getLocalHost().hostName
+    // No host-name lookup as default: messages are created on the socket thread while parsing (M4).
+    var name: String = ""
 ) : Message(MessageType.HELLOBACK) {
 
     override fun readData(inStream: DataInputStream, dataSize: Int) {
         majorVersion = inStream.readShort().toInt()
         minorVersion = inStream.readShort().toInt()
-        name = inStream.readString()
+        // A server speaking the "Synergy" protocol name sends its hello in this shape, without a name.
+        // The name is length-prefixed UTF-8 (as written by writeString), not a fixed 4-byte code.
+        name = if (dataSize > 4 && inStream.available() >= 4) {
+            val len = inStream.readInt()
+            require(len in 0..MAX_NAME_BYTES && len <= inStream.available()) { "invalid screen name length $len" }
+            ByteArray(len).also { inStream.readFully(it) }.toString(Charsets.UTF_8)
+        } else ""
     }
 
     override fun writeData(outStream: DataOutputStream) {
@@ -47,4 +51,8 @@ class HelloBackMessage(// Protocol version and screen name
         outStream.writeString(name)
     }
 
+
+    private companion object {
+        const val MAX_NAME_BYTES = 1024
+    }
 }

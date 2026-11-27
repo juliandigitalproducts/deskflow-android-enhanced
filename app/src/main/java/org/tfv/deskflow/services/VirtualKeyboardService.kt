@@ -61,6 +61,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import arrow.core.raise.catch
+import org.tfv.deskflow.logging.SafeLogText
 import org.tfv.deskflow.Application
 import org.tfv.deskflow.R
 import org.tfv.deskflow.client.events.KeyboardEvent
@@ -80,6 +81,7 @@ import org.tfv.deskflow.ui.components.rememberAppState
 @OptIn(ExperimentalLayoutApi::class)
 class VirtualKeyboardService : InputMethodService() {
   companion object {
+    private const val MAX_EXTRACT_CHARS = 4000
     private val log =
       KLoggingManager.logger(VirtualKeyboardService::class.java.simpleName)
 
@@ -157,10 +159,28 @@ class VirtualKeyboardService : InputMethodService() {
 
   internal fun saveEditHistory(
     info: EditorInfo?,
-    extractedText: ExtractedText,
+    extractedText: ExtractedText?,
   ) {
+    // M6: never keep copies of password / no-learning fields in memory.
+    if (extractedText == null || isPrivateField(info)) return
     getEditHistory(info)?.save(extractedText.text.toString(), maxSize = 25)
   }
+
+  private fun isPrivateField(info: EditorInfo?): Boolean {
+    if (info == null) return false
+    val variation = info.inputType and android.text.InputType.TYPE_MASK_VARIATION
+    val cls = info.inputType and android.text.InputType.TYPE_MASK_CLASS
+    val password = (cls == android.text.InputType.TYPE_CLASS_TEXT && (
+      variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+        variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+        variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)) ||
+      (cls == android.text.InputType.TYPE_CLASS_NUMBER && variation == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+    val noLearning = (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+    return password || noLearning
+  }
+
+  /** M6: only the text around the cursor, not the whole document, per key press (IPC on the main thread). */
+  private fun extractRequest() = ExtractedTextRequest().apply { hintMaxChars = MAX_EXTRACT_CHARS; hintMaxLines = 50 }
 
   internal val editorInfo: EditorInfo?
     get() = currentInputEditorInfo
@@ -324,15 +344,15 @@ class VirtualKeyboardService : InputMethodService() {
     return view
   }
 
-  fun currentExtractedTest(): ExtractedText {
-    return currentInputConnection.getExtractedText(ExtractedTextRequest(), 0)
+  fun currentExtractedTest(): ExtractedText? {
+    return currentInputConnection.getExtractedText(extractRequest(), 0)
   }
 
   private fun applyCommand(
     command: String?,
     ic: InputConnection = currentInputConnection,
-    extractedText: ExtractedText =
-      ic.getExtractedText(ExtractedTextRequest(), 0),
+    extractedText: ExtractedText? =
+      ic.getExtractedText(extractRequest(), 0),
   ) {
     command?.let {
       ic.commitText(it, 1)
@@ -341,14 +361,15 @@ class VirtualKeyboardService : InputMethodService() {
   }
 
   internal fun logCurrentImeState(calledBy: String = "KeyboardEvent") {
+    // Runs on every cursor/selection update: skip the two IPC calls below unless debug logging is on, and never log
+    // the field content itself (it can be a password or any other typed text) – only its size and the selection.
+    if (!log.isDebugEnabled()) return
     val ic = currentInputConnection
-    val extracted = ic?.getExtractedText(ExtractedTextRequest(), 0)
-    log.debug {
-      "$calledBy >> Extracted text >> \"${extracted?.text}\" — selection: [${extracted?.selectionStart}, ${extracted?.selectionEnd}]"
-    }
+    val extracted = ic?.getExtractedText(extractRequest(), 0)
+    log.debug { SafeLogText.extractedText(calledBy, extracted?.text, extracted?.selectionStart, extracted?.selectionEnd) }
 
     val selected = ic?.getSelectedText(0)
-    log.debug { "$calledBy >> Selected text >> \"$selected\"" }
+    log.debug { SafeLogText.selectedText(calledBy, selected) }
   }
 
   /**
@@ -377,7 +398,7 @@ class VirtualKeyboardService : InputMethodService() {
     // 1. Check if we have a valid input connection.
     val ic = currentInputConnection
     if (ic == null) {
-      log.warn { "Current input connection is null, ignoring event: $event" }
+      log.warn { "Current input connection is null, ignoring ${event.type} event" }
       return
     }
 
@@ -386,12 +407,12 @@ class VirtualKeyboardService : InputMethodService() {
       keyboardViewLifecycleOwner.lifecycle.currentState <
         Lifecycle.State.RESUMED
     ) {
-      log.warn { "Lifecycle is not started, ignoring event: $event" }
+      log.warn { "Lifecycle is not started, ignoring ${event.type} event" }
       return
     }
 
-    // 3. Only handle `Down` type events.
-    if (event.type != KeyboardEvent.Type.Down) {
+    // 3. Handle `Down` and auto-repeat (held Backspace / arrow keys repeat like on a real keyboard).
+    if (event.type != KeyboardEvent.Type.Down && event.type != KeyboardEvent.Type.Repeat) {
       return
     }
 
@@ -406,7 +427,7 @@ class VirtualKeyboardService : InputMethodService() {
 
     // 5. If all the previous checks passed, grab the current `ExtractedText` of
     // the `InputConnection`.
-    val et = ic.getExtractedText(ExtractedTextRequest(), 0)
+    val et = ic.getExtractedText(extractRequest(), 0)
     val mods = event.getModifiers()
     val editHistory = getEditHistory()
 
@@ -425,7 +446,7 @@ class VirtualKeyboardService : InputMethodService() {
         action.key.action(ic, et, specialKey, mods, event, editHistory, this)
       }
       else -> {
-        log.debug { "Received $event" }
+        log.debug { "Received ${event.type} key event" }
         val keyChar = id.toChar()
         val keyStr = keyChar.toString()
 
@@ -465,7 +486,7 @@ class VirtualKeyboardService : InputMethodService() {
           }
 
           else -> {
-            log.debug { "Applying command: $keyStr" }
+            log.debug { "Applying command (${keyStr.length} chars)" }
             applyCommand(keyStr, ic, et)
           }
         }

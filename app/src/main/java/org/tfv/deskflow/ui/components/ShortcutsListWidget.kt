@@ -36,10 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -94,23 +91,14 @@ fun ShortcutsListWidget(
       Toolbar {
         val extColorScheme = LocalDeskflowExtendedColorScheme.current
 
+        // The shortcuts are fixed defaults from res/raw (custom shortcuts are not stored anywhere yet), so there
+        // is no edit button: it did nothing (U6 from the emulator test).
         Text(
           text = stringResource(R.string.shortcuts_list_widget_title),
           style = MaterialTheme.typography.titleLarge,
         )
 
         DeskflowFillSpacer()
-
-        DeskflowIconButton(
-          icon = {
-            Icon(
-              Icons.Default.Edit,
-              contentDescription =
-                stringResource(R.string.shortcuts_list_widget_toolbar_edit),
-            )
-          },
-          onClick = {},
-        )
       }
     },
   ) {

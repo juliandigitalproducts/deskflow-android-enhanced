@@ -24,6 +24,7 @@
 
 package org.tfv.deskflow.client.util.logging
 
+import java.util.concurrent.ConcurrentHashMap
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.tfv.deskflow.client.util.isAndroidRuntime
@@ -31,8 +32,10 @@ import kotlin.reflect.KClass
 
 object KLoggingManager {
 
-    private val loggerMap = mutableMapOf<String, KLogger>()
-    private val forwardingLoggerMap = mutableMapOf<String, KLogger>()
+    // Loggers are created from companion objects that initialise on different threads (socket thread, executors,
+    // main thread); a plain HashMap is not safe for concurrent getOrPut.
+    private val loggerMap = ConcurrentHashMap<String, KLogger>()
+    private val forwardingLoggerMap = ConcurrentHashMap<String, KLogger>()
 
     init {
         try {
@@ -56,7 +59,12 @@ object KLoggingManager {
     fun forwardingLogger(name: String): KLogger = forwardingLoggerMap.getOrPut(name) {
         when (androidLoggerClazz) {
             null -> {
-                throw Error("Android logger not available, ensure you are running on Android or have the AndroidForwardingLogger class in your classpath.")
+                // On a plain JVM (unit tests, the protocol harness) there is nothing to forward to: use a normal
+                // logger. Throwing here made MessageHandler unusable outside Android (class init failed).
+                if (isAndroidRuntime()) {
+                    throw Error("Android logger not available, ensure the AndroidForwardingLogger class is in your classpath.")
+                }
+                KotlinLogging.logger(name)
             }
 
             else -> androidLoggerClazz.getDeclaredConstructor(String::class.java)

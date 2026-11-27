@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,8 +90,9 @@ fun VirtualKeyboardView(
 
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.deskflow_icon_fit),
+                        painter = painterResource(id = R.drawable.app_logo_glyph),
                         contentDescription = stringResource(R.string.app_toolbar_logo_desc),
+                        colorFilter = ColorFilter.tint(LocalContentColor.current),
                         modifier = Modifier.height(24.dp),
                     )
                     val serverHostAndPort =

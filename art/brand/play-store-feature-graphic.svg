@@ -1,0 +1,17 @@
+<!-- SPDX-License-Identifier: MIT · Copyright (c) 2026 juliandigitalproducts · Deskflow Android Enhanced app logo (own design). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+ <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2B3A7A"/><stop offset="1" stop-color="#4A2370"/></linearGradient></defs>
+ <rect width="1024" height="500" fill="url(#bg)"/>
+ <g transform="translate(-20 52) scale(3.7)">
+ <path d="M54.5,33h20a6.5,6.5 0 0 1 6.5,6.5v29a6.5,6.5 0 0 1 -6.5,6.5h-20a6.5,6.5 0 0 1 -6.5,-6.5v-29a6.5,6.5 0 0 1 6.5,-6.5z" fill="none" stroke="#FFFFFF" stroke-width="4.5"/>
+ <path d="M58.5,43.5v20.5l5,-4.6l3.6,7.7l3.8,-1.8l-3.6,-7.6l6.9,-0.2z" fill="#FFB547" stroke="#FFB547" stroke-width="1.6" stroke-linejoin="round"/>
+ <path d="M26,47l6.5,7l-6.5,7" fill="none" stroke="#FFB547" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.5"/>
+ <path d="M34.5,47l6.5,7l-6.5,7" fill="none" stroke="#FFB547" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+ </g>
+ <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#FFFFFF">
+  <text x="360" y="215" font-size="54" font-weight="700">Deskflow Android</text>
+  <text x="360" y="275" font-size="54" font-weight="700" fill="#FFB547">Enhanced</text>
+  <text x="360" y="330" font-size="25" fill="#D8DCF0">Use your desktop keyboard and mouse on Android</text>
+  <text x="360" y="368" font-size="20" fill="#AEB4D8">Unofficial client · not affiliated with the Deskflow project</text>
+ </g>
+</svg>

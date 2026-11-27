@@ -26,20 +26,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission
-            android:name="android.permission.BIND_INPUT_METHOD"
-            tools:ignore="ProtectedPermissions"/>
-
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"  />
-    <uses-permission android:name="org.tfv.deskflow.CONNECTION_SERVICE_PERMISSION"/>
 
     <queries>
         <intent>
@@ -50,11 +40,12 @@
 
     <application
             android:name=".Application"
-            android:allowBackup="true"
+            android:allowBackup="false"
             android:dataExtractionRules="@xml/data_extraction_rules"
             android:fullBackupContent="@xml/backup_rules"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name"
+            android:localeConfig="@xml/locales_config"
             android:theme="@style/Theme.DeskflowKM"
     >
 
@@ -71,26 +62,11 @@
             </intent-filter>
         </activity>
 
-        <receiver
-                android:name=".receivers.BootReceiver"
-                android:enabled="true"
-                android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-            </intent-filter>
-        </receiver>
-
+        <!-- App-internal only (code review D3): bound by explicit intent from the UI and the
+             accessibility service. -->
         <service
                 android:name=".services.ConnectionService"
-                android:exported="true"
-                android:permission="org.tfv.deskflow.CONNECTION_SERVICE_PERMISSION"
-                android:protectionLevel="signature"
-        >
-<!--            android:process=":connection" -->
-            <intent-filter>
-                <action android:name="org.tfv.deskflow.services.ConnectionService" />
-            </intent-filter>
-        </service>
+                android:exported="false" />
         <service
                 android:name=".services.VirtualKeyboardService"
                 android:exported="true"

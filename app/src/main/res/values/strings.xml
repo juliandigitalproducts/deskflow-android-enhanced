@@ -24,41 +24,45 @@
   -->
 
 <resources>
-    <string name="ime_name">Deskflow</string>
-    <string name="app_name">Deskflow</string>
+    <string name="ime_name" translatable="false">Deskflow</string>
+    <string name="app_name" translatable="false">Deskflow-Android-Enhanced</string>
     <string name="title_activity_settings">Deskflow Settings</string>
 
     <string name="logo_content_desc">Logo</string>
 
     <string name="settings_screen_screen_name_placeholder">Screen Name</string>
     <string name="settings_screen_screen_address_placeholder">Hostname or IP Address</string>
-    <string name="settings_screen_screen_port_placeholder">24800</string>
+    <string name="settings_screen_screen_port_placeholder" translatable="false">24800</string>
     <string name="app_prefs_screen_server_use_tls">Use TLS</string>
     <string name="bottom_bar_connected">Connected\n%s</string>
     <string name="bottom_bar_disconnected">Disconnected\n%s</string>
 
     <string name="permission_dialog_title_required">Permissions Required</string>
     <string name="permission_dialog_title_optional">Grant Permission</string>
-    <string name="permission_dialog_overlay_message">Draw overlays permission is required to visualize a mouse pointer, press OK to open settings</string>
-    <string name="permission_dialog_dismissed_message">In order to properly use Deskflow for Android, you must enable these permissions.</string>
+    <string name="permission_dialog_dismissed_message">Deskflow can only control this device once the accessibility service is enabled. The dialog comes back the next time the app starts.</string>
     <string name="permission_dialog_buttons_open_settings">Open Settings</string>
-    <string name="permission_dialog_accessibility_service_message">Accessibility service permissions are required in order to create a virtual mouse pointer, respond to keyboard shortcuts (like opening the app switcher) and integrating editor controls. If it\'s not enabled, Deskflow can not function.</string>
-    <string name="settings_screen_instructions">Enter server connectivity information for the Deskflow/Deskflow server, which will control the input of this device.</string>
+    <string name="permission_dialog_accessibility_service_message">Accessibility service permissions are required in order to create a virtual mouse pointer, respond to keyboard shortcuts (like opening the app switcher) and integrating editor controls. If it\'s not enabled, Deskflow can not function.\n\nPrivacy: Deskflow uses this access only on this device to carry out the input from your computer. Screen content is not sent anywhere; data is only exchanged with the Deskflow server you set up.</string>
+    <string name="settings_screen_instructions">Enter the connection details of the Deskflow server that will control the input of this device.</string>
     <string name="settings_screen_title"><![CDATA[Connect Keyboard & Mouse]]></string>
     <string name="button_cancel">Cancel</string>
+    <string name="untrusted_server_title">Trust this server?</string>
+    <string name="untrusted_server_message">%1$s is not known yet. Only connect if this fingerprint matches the one shown by Deskflow on your computer (Settings → Security / TLS):\n\n%2$s\n\nA different fingerprint means another device may be pretending to be your computer.</string>
+    <string name="untrusted_server_trust">Fingerprint matches – trust</string>
+    <string name="untrusted_server_reject">Don\'t connect</string>
     <string name="button_save">Save</string>
     <string name="button_done">Done</string>
     <string name="settings_screen_screen_name_label">Screen Name</string>
     <string name="settings_screen_screen_address_label">Hostname or IP address</string>
     <string name="settings_screen_screen_port_label">Port</string>
-    <string name="clipboard_item_label">Deskflow</string>
+    <string name="clipboard_item_label" translatable="false">Deskflow</string>
     <string name="log_widget_toolbar_clear_logs">Clear logs</string>
     <string name="log_widget_toolbar_scroll_to_bottom">Scroll to bottom</string>
+    <string name="scroll_up">Scroll up</string>
+    <string name="scroll_down">Scroll down</string>
     <string name="log_widget_title">Logs</string>
     <string name="log_widget_toolbar_filter_logs_label">Filter logs</string>
     <string name="connection_status_widget_toolbar_stop">Stop Deskflow Client</string>
     <string name="connection_status_widget_title">Connection</string>
-    <string name="shortcuts_list_widget_toolbar_edit">Edit</string>
     <string name="shortcuts_list_widget_title">Shortcuts</string>
     <string name="app_toolbar_logo_desc">Logo</string>
     <string name="app_toolbar_button_settings">Settings</string>
@@ -78,15 +82,49 @@
     <string name="connection_status_widget_header_status_connecting">Connecting…</string>
     <string name="connection_status_widget_header_status_connected">Connected</string>
     <string name="connection_status_widget_header_status_stopped">Stopped</string>
-    <string name="global_input_service_notification_channel_name">Deskflow</string>
+    <string name="connection_status_widget_header_status_tls_failed">TLS error</string>
+    <string name="connection_status_widget_header_status_unreachable">Not reachable</string>
+    <string name="connection_status_widget_header_status_failed">Connection error</string>
+    <string name="connection_status_error_tls">TLS handshake failed. Is TLS switched on in Deskflow on the computer? TLS has to be on (or off) on both sides. Failed attempts: %1$d</string>
+    <string name="connection_status_error_unreachable">Server not reachable. Check address and port, and that Deskflow is running on the computer in the same network. Failed attempts: %1$d</string>
+    <string name="connection_status_error_other">Connection failed, Deskflow keeps retrying. Failed attempts: %1$d</string>
+    <string name="app_toolbar_status_desc">Connection status: %1$s</string>
+    <string name="global_input_service_notification_channel_name" translatable="false">Deskflow</string>
     <string name="global_input_service_notification_channel_description">Notifications related to Deskflow input</string>
     <string name="global_input_service_notification_ime_not_setup">Deskflow Keyboard is not currently active.</string>
     <string name="global_input_service_notification_action_open_keyboard_settings">Open Keyboard Settings</string>
     <string name="toast_settings_saved">Successfully saved settings.</string>
-    <string name="permission_dialog_notifications_message"><![CDATA[Enable notifications in order for Deskflow connectivity & clipboard event information.]]></string>
+    <string name="permission_dialog_notifications_message">Allow notifications so that Deskflow can tell you about the connection and the clipboard.</string>
     <string name="permission_dialog_buttons_dismiss">Ignore</string>
-    <string name="permission_dialog_nearby_devices_message">Deskflow needs to be able to search for nearby devices on your network.</string>
-    <string name="permission_dialog_ime_enabled_message">In order to use Deskflow, you must enable the Deskflow keyboard in settings.</string>
+    <string name="permission_dialog_buttons_later">Later</string>
+    <string name="permission_dialog_ime_enabled_message">In order to use Deskflow, you must enable the Deskflow keyboard in settings.\n\nNote: While connected, Deskflow switches the active keyboard to the Deskflow keyboard when a text field opens, so that typing on your computer arrives here. You can switch back at any time with the keyboard switcher.</string>
 
 
+    <string name="settings_screen_auto_discover_label">Find server automatically</string>
+    <string name="settings_screen_auto_discover_description">Searches the local network for a Deskflow server (e.g. your Mac) and connects to it, no hostname or IP address needed.</string>
+    <string name="settings_screen_discover_button">Search network</string>
+    <string name="settings_screen_discover_none_found">No Deskflow server found. Make sure the server is running and both devices are on the same network.</string>
+    <string name="settings_screen_clipboard_sync_label">Share clipboard with the computer</string>
+    <string name="settings_screen_clipboard_sync_description">Copied text is sent to the connected computer and text copied there arrives here. Clips that apps mark as sensitive (e.g. passwords) are never sent.</string>
+    <string name="settings_screen_scrolling_title">Scrolling</string>
+    <string name="settings_screen_scroll_invert_y_label">Invert vertical scrolling (Y axis)</string>
+    <string name="settings_screen_scroll_invert_x_label">Invert horizontal scrolling (X axis)</string>
+    <string name="settings_screen_scroll_invert_description">Use these if scrolling moves the content in the wrong direction (e.g. natural scrolling on macOS).</string>
+    <string name="settings_screen_scroll_speed_label">Scroll speed: %1$d%%</string>
+    <string name="settings_screen_tls_fingerprint_label">TLS fingerprint of this device. When connecting the first time, the Deskflow app on the server (e.g. your Mac) asks to trust it, compare and accept:</string>
+    <string name="settings_screen_scroll_mode_label">Scroll mode</string>
+    <string name="settings_screen_scroll_mode_finger">1. Virtual finger</string>
+    <string name="settings_screen_scroll_mode_finger_description">A finger stays on the screen and follows the trackpad directly.</string>
+    <string name="settings_screen_scroll_mode_swipes">2. Short swipes</string>
+    <string name="settings_screen_scroll_mode_swipes_description">Scrolling is collected briefly and applied as short swipes, one after another.</string>
+    <string name="settings_screen_scroll_mode_flick">3. Flick (momentum)</string>
+    <string name="settings_screen_scroll_mode_flick_description">One swipe with momentum per scroll movement, like flicking with a finger.</string>
+    <string name="settings_screen_scroll_mode_steps">4. Fixed steps</string>
+    <string name="settings_screen_scroll_mode_steps_description">Even, calm steps without momentum.</string>
+    <string name="settings_screen_scroll_mode_page">5. Page by page (no gestures)</string>
+    <string name="settings_screen_scroll_mode_page_description">Asks the scrollable view under the pointer to scroll. Very stable, but in big jumps.</string>
+    <string name="settings_screen_scroll_smoothing_label">Smoothing: %1$d%%</string>
+    <string name="settings_screen_scroll_smoothing_description">Higher is smoother, but reacts a bit later. Affects modes 1–3 (and the pause between pages in mode 5).</string>
+    <string name="settings_screen_plaintext_warning">Without TLS everything is sent unencrypted: anyone in the same network could read the shared clipboard or send input to this device. Turn TLS on in Deskflow on the computer and here.</string>
+    <string name="settings_screen_forget_trusted_servers">Forget trusted server certificates (%1$d)</string>
 </resources>

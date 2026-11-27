@@ -1,0 +1,90 @@
+# ---- BASIS (aus EINRICHTUNGSASSISTENT/github-publish/gitleaks-basis.toml, nicht hier ändern) ----
+# github-publish/gitleaks-basis.toml – gemeinsame gitleaks-Basis für alle Repos (Secret-Prüfung vor GitHub).
+#
+# Wofür: Die gitleaks-Standardregeln (useDefault) bleiben aktiv; dazu kommen strengere Regeln für Lücken, die
+# real aufgefallen sind (Telegram-Bot-Token mit 34 statt 35 Zeichen wurde von der Standardregel nicht erkannt)
+# bzw. die wir grundsätzlich verbieten (Private-Key-Header, Passwörter in Konfigurationsdateien).
+#
+# Benutzung: Jedes Repo hat eine .gitleaks.toml = dieser Block (Kopie, von gitleaks-config-sync.sh gepflegt) +
+# Block "REPO-AUSNAHMEN". gitleaks 8.30.1 kann eine Basis nur über einen Dateipfad erweitern, der im CI und im
+# Pre-Push-Hook nicht überall gleich ist – deshalb Kopie statt [extend] path.
+#   Basis aktualisieren:  github-publish/gitleaks-config-sync.sh <repo>          (Check: --check, Exit 1 = veraltet)
+#
+# Ausnahmen pro Repo (NUR im Block "REPO-AUSNAHMEN" der Repo-Datei, nie hier):
+#   [[allowlists]]
+#   description = "warum das kein Geheimnis ist"
+#   targetRules = ["passwort-zuweisung"]          # immer auf die betroffene(n) Regel(n) beschränken
+#   paths = ['''^tests/beispiel\.properties$''']   # genaue Datei, kein ganzer Ordner
+#   regexes = ['''^nur-dieser-wert$''']            # und/oder der konkrete (harmlose) Wert
+#   condition = "AND"                               # Pfad UND Wert müssen passen
+# Altlasten in der Historie (Wert schon entfernt, Commit bleibt): Fingerprint "<commit>:<datei>:<regel>:<zeile>"
+# in .gitleaksignore des Repos – nur nach Prüfung, dass es kein echtes (oder ein widerrufenes) Geheimnis ist.
+# Im Block REPO-AUSNAHMEN keine losen Schlüssel (title = …) und kein [[rules.allowlists]] – die würden an die
+# letzte Basis-Regel angehängt. Nur [[allowlists]] (mit targetRules) und ggf. eigene [[rules]].
+#
+# Test-Tokens in Tests immer zur Laufzeit zusammensetzen, nie realistisch aussehende Literale einchecken.
+
+[extend]
+useDefault = true
+
+# Telegram-Bot-Token, locker: 8–10 Ziffern ":" 33–36 Zeichen (die Standardregel verlangt genau 35 Zeichen, ein "A"
+# am Anfang und das Wort "telegram"). Greift auch direkt hinter ".../bot". Absichtlich ohne entropy.
+[[rules]]
+id = "telegram-bot-token-locker"
+description = "Telegram-Bot-Token (8-10 Ziffern, Doppelpunkt, 33-36 Zeichen)"
+regex = '''(?:^|[^0-9])([0-9]{8,10}:[A-Za-z0-9_-]{33,36})(?:$|[^A-Za-z0-9_-])'''
+secretGroup = 1
+keywords = [":"]
+
+# Private-Key-Header (PEM/OpenSSH/PGP) – Fund schon beim Header, auch ohne Schlüsselinhalt.
+[[rules]]
+id = "private-key-header"
+description = "Private-Key-Header (RSA/EC/DSA/OPENSSH/PGP/ENCRYPTED/ohne Typ)"
+regex = '''-----BEGIN ?(?:(?:RSA|EC|DSA|OPENSSH|PGP|ENCRYPTED) )?PRIVATE KEY(?: BLOCK)?-----'''
+keywords = ["private key"]
+
+# Passwort-/Token-Zuweisungen in Konfigurationsdateien: key=value bzw. key: value, Wert ≥ 8 Zeichen.
+[[rules]]
+id = "passwort-zuweisung"
+description = "Passwort/Secret/Token/API-Key als Wert in einer Konfigurationsdatei"
+path = '''(?i)(?:\.properties|\.env|(?:^|/)\.env[^/]*|\.gradle|\.gradle\.kts|\.ya?ml|\.json|\.toml|\.conf|\.ini)$'''
+regex = '''(?i)(?:^|[\s"'{,;])[A-Za-z0-9_.-]*(?:password|passwd|passphrase|secret|token|api[_-]?key|storepass|keypass)[A-Za-z0-9_.-]*["']?[ \t]*[=:][ \t]*["']?([^\s"'#,;]{8,})'''
+secretGroup = 1
+keywords = ["password", "passwd", "passphrase", "secret", "token", "api_key", "api-key", "apikey", "storepass", "keypass"]
+
+# Platzhalter und Verweise sind keine Geheimnisse (geprüft wird der Wert = secretGroup).
+[[rules.allowlists]]
+description = "Platzhalter, Variablen, Aufrufe statt Literal"
+regexes = [
+  '''^\$\{''',                      # ${VAR}, ${{ secrets.X }}
+  '''^\$\(''',                      # $(befehl)
+  '''^\$[A-Za-z_]''',               # $VAR
+  '''^<.*''',                       # <dein-passwort>
+  '''(?i)your[_-]''',               # your_password
+  '''(?i)example''',
+  '''(?i)change_?me''',
+  '''(?i)placeholder''',
+  '''(?i)dummy''',
+  '''(?i)xxx''',
+  '''\*\*\*''',
+  '''(?i)^(?:true|false|null|none|nil|undefined)$''',
+  '''System\.getenv''',
+  '''providers\.gradleProperty''',
+  '''findProperty''',
+  '''^[A-Za-z_][A-Za-z0-9_.]*[(\[]$''', # Code-Ausdruck (Aufruf/Index), kein Literal: props["x"], getenv("X")
+  '''^(?:/|~/|\./|\.\./)[A-Za-z0-9_./-]*$''', # reiner Dateipfad (SECRETS_DIR="/media/…/.secrets", token_file: ./x)
+]
+
+[[rules.allowlists]]
+description = "Forgejo/GitHub-Actions-Ausdrücke"
+regexTarget = "line"
+regexes = ['''\$\{\{\s*(?:secrets|vars|env|inputs|steps|needs)\.[A-Za-z0-9_.-]+\s*\}\}''']
+# ---- REPO-AUSNAHMEN ----
+# Eigene Ausnahmen dieses Repos (bleiben bei gitleaks-config-sync.sh erhalten). Eng fassen:
+# [[allowlists]] mit targetRules + paths + regexes (condition = "AND"), Beispiel im Kopf der Basis oben.
+# Altlasten in der Historie: Fingerprint in .gitleaksignore (nur nach Prüfung).
+
+[[allowlists]]
+description = "Selbstsigniertes Test-Zertifikat (CN=deskflow-test-server) für PinningTlsTest (:client:test), kein Produktivschlüssel"
+targetRules = ["pkcs12-file"]
+paths = ['''^client/src/test/resources/test-server\.p12$''']

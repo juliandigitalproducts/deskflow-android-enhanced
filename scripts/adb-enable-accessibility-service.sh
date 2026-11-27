@@ -24,5 +24,9 @@
 # SOFTWARE.
 #
 
-adb shell settings put secure enabled_accessibility_services \
-  "org.tfv.deskflow/org.tfv.deskflow.services.GlobalInputService"
+# Adds the Deskflow accessibility service to the enabled list instead of replacing it
+# (other enabled services, e.g. TalkBack or a password manager, stay on).
+# Usage: adb-enable-accessibility-service.sh [application id]
+APP_ID="${1:-de.juliandigitalproducts.deskflow}"
+SVC="$APP_ID/org.tfv.deskflow.services.GlobalInputService"
+adb shell "cur=\$(settings get secure enabled_accessibility_services); case \":\$cur:\" in *\":$SVC:\"*) ;; *) if [ -z \"\$cur\" ] || [ \"\$cur\" = null ]; then new=\"$SVC\"; else new=\"\$cur:$SVC\"; fi; settings put secure enabled_accessibility_services \"\$new\" ;; esac; settings put secure accessibility_enabled 1"

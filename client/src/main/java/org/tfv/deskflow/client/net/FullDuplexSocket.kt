@@ -27,7 +27,6 @@
 package org.tfv.deskflow.client.net
 
 
-import java.security.cert.X509Certificate
 import javax.net.ssl.X509TrustManager
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
@@ -35,6 +34,7 @@ import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.nio.channels.SocketChannel
 import java.util.concurrent.LinkedBlockingQueue
+import javax.net.ssl.KeyManager
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLEngineResult
@@ -52,6 +52,9 @@ class FullDuplexSocket(
   private val host: String,
   private val port: Int,
   private val useTls: Boolean,
+  private val keyManagers: Array<KeyManager>? = null,
+  /** Decides whether the server certificate is accepted (see [PinningTrustManager]). */
+  private val trustManager: X509TrustManager? = null,
 ) :
   AbstractDisposable(),
   ISimpleEventEmitter<FullDuplexSocket.SocketEvent> by SimpleEventEmitter<
@@ -79,7 +82,9 @@ class FullDuplexSocket(
   private var netOutBuffer: ByteBuffer? = null
   private var netInBuffer: ByteBuffer? = null
   private var appInBuffer: ByteBuffer? = null
-  private val trustManager = AllCertsTrustManager()
+
+  /** Partially written plaintext message; must go out before anything else in [outbound]. */
+  private var pendingWrite: ByteBuffer? = null
 
   /** Check if the socket thread is running */
   val isRunning: Boolean
@@ -117,19 +122,25 @@ class FullDuplexSocket(
         thread?.interrupt()
       } catch (err: Exception) {}
 
-      log.trace { "Joining socket" }
-      try {
-        thread?.join()
-      } catch (err: Exception) {}
+      // stop() is also called from the socket thread itself (EOF, error) –
+      // joining there would wait for itself forever.
+      if (thread != null && thread !== Thread.currentThread()) {
+        log.trace { "Joining socket" }
+        try {
+          thread.join(JOIN_TIMEOUT_MS)
+        } catch (err: InterruptedException) {
+          Thread.currentThread().interrupt()
+        }
+      }
       this.thread = null
 
       val channel = channel
       if (channel != null) {
-        if (channel.isConnected) {
-          try {
-            channel.close()
-          } catch (err: Error) {}
-        }
+        // H5: also a channel that is still connecting (OP_CONNECT) must be closed, otherwise every retry leaks a
+        // file descriptor. Closing the selector does not close its channels.
+        try {
+          channel.close()
+        } catch (err: Exception) {}
         this.channel = null
       }
 
@@ -137,7 +148,7 @@ class FullDuplexSocket(
       if (selector != null) {
         try {
           selector.close()
-        } catch (err: Error) {}
+        } catch (err: Exception) {}
         this.selector = null
       }
 
@@ -159,6 +170,7 @@ class FullDuplexSocket(
     if (thread == null || !thread.isAlive) {
       return
     }
+    if (thread === Thread.currentThread()) return
     thread.join()
   }
 
@@ -171,6 +183,17 @@ class FullDuplexSocket(
 
       // Enqueue the next message
       outbound.put(ByteBuffer.wrap(data))
+      // Enable OP_WRITE so selector triggers write without spinning
+      channel?.let { sc ->
+        selector?.let { sel ->
+          val key = sc.keyFor(sel)
+          if (key != null && key.isValid) {
+            try {
+              key.interestOps(key.interestOps() or SelectionKey.OP_WRITE)
+            } catch (_: Exception) {}
+          }
+        }
+      }
       // Wake up selector in case it’s blocked
       selector?.wakeup()
     }
@@ -185,24 +208,34 @@ class FullDuplexSocket(
     val netOutBuffer =
       netOutBuffer ?: throw SSLException("netOutBuffer is null")
     var hsStatus = sslEngine.handshakeStatus
+    val deadline = System.currentTimeMillis() + HANDSHAKE_TIMEOUT_MS
     while (
       hsStatus != SSLEngineResult.HandshakeStatus.FINISHED &&
         hsStatus != SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING
     ) {
+      if (System.currentTimeMillis() > deadline) {
+        throw SSLException("TLS handshake timed out")
+      }
       when (hsStatus) {
         SSLEngineResult.HandshakeStatus.NEED_UNWRAP -> {
-          if (sc.read(netInBuffer) < 0)
-            throw SSLException("Channel closed during handshake")
           netInBuffer.flip()
           val res = sslEngine.unwrap(netInBuffer, appInBuffer)
           netInBuffer.compact()
           hsStatus = res.handshakeStatus
+          if (res.status == SSLEngineResult.Status.CLOSED) {
+            throw SSLException("Connection closed during handshake")
+          }
+          if (res.status == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
+            val read = sc.read(netInBuffer)
+            if (read < 0) throw SSLException("Channel closed during handshake")
+            if (read == 0) Thread.sleep(5)
+          }
         }
         SSLEngineResult.HandshakeStatus.NEED_WRAP -> {
           netOutBuffer.clear()
           val res = sslEngine.wrap(ByteBuffer.allocate(0), netOutBuffer)
           netOutBuffer.flip()
-          while (netOutBuffer.hasRemaining()) sc.write(netOutBuffer)
+          writeFully(sc, netOutBuffer)
           hsStatus = res.handshakeStatus
         }
         SSLEngineResult.HandshakeStatus.NEED_TASK -> {
@@ -214,6 +247,107 @@ class FullDuplexSocket(
           hsStatus = sslEngine.handshakeStatus
         }
         else -> throw SSLException("Unexpected handshake status: $hsStatus")
+      }
+    }
+  }
+
+  @Throws(SSLException::class)
+  private fun unwrapIncoming(sc: SocketChannel, readBuffer: DynamicByteBuffer) {
+    val netInBuffer = netInBuffer ?: throw SSLException("netInBuffer is null")
+    val sslEngine = sslEngine ?: throw SSLException("sslEngine is null")
+    var appInBuffer = appInBuffer ?: throw SSLException("appInBuffer is null")
+
+    var produced = false
+    if (appInBuffer.position() > 0) {
+      appInBuffer.flip()
+      readBuffer.append(appInBuffer, appInBuffer.remaining())
+      appInBuffer.compact()
+      produced = true
+    }
+
+    netInBuffer.flip()
+    try {
+      while (netInBuffer.hasRemaining()) {
+        val res = sslEngine.unwrap(netInBuffer, appInBuffer)
+        if (res.bytesProduced() > 0) {
+          appInBuffer.flip()
+          readBuffer.append(appInBuffer, appInBuffer.remaining())
+          appInBuffer.compact()
+          produced = true
+        }
+
+        when (res.status) {
+          SSLEngineResult.Status.BUFFER_UNDERFLOW -> break
+          SSLEngineResult.Status.BUFFER_OVERFLOW -> {
+            val bigger =
+              ByteBuffer.allocate(
+                maxOf(
+                  appInBuffer.capacity() * 2,
+                  sslEngine.session.applicationBufferSize,
+                )
+              )
+            appInBuffer.flip()
+            bigger.put(appInBuffer)
+            appInBuffer = bigger
+            this.appInBuffer = bigger
+          }
+          SSLEngineResult.Status.CLOSED -> throw SSLException("SSLEngine closed")
+          else -> {}
+        }
+
+        runHandshakeTasks(sc)
+        if (res.bytesConsumed() == 0 && res.bytesProduced() == 0 &&
+          res.status == SSLEngineResult.Status.OK) {
+          break
+        }
+      }
+    } finally {
+      netInBuffer.compact()
+    }
+
+    if (produced) {
+      emit(SocketEvent.ReceiveEvent(readBuffer, this))
+    }
+  }
+
+  /**
+   * Writes the whole buffer on the non-blocking channel. When the kernel buffer
+   * is full, waits briefly instead of spinning, with an upper time limit.
+   */
+  private fun writeFully(sc: SocketChannel, buf: ByteBuffer) {
+    val deadline = System.currentTimeMillis() + WRITE_TIMEOUT_MS
+    while (buf.hasRemaining()) {
+      if (sc.write(buf) == 0) {
+        if (System.currentTimeMillis() > deadline) throw SSLException("TLS write timed out")
+        Thread.sleep(WRITE_RETRY_SLEEP_MS)
+      }
+    }
+  }
+
+  @Throws(SSLException::class)
+  private fun runHandshakeTasks(sc: SocketChannel) {
+    val sslEngine = sslEngine ?: throw SSLException("sslEngine is null")
+    val netOutBuffer = netOutBuffer ?: throw SSLException("netOutBuffer is null")
+    var hsStatus = sslEngine.handshakeStatus
+    var guard = 0
+    while (guard++ < 32) {
+      when (hsStatus) {
+        SSLEngineResult.HandshakeStatus.NEED_TASK -> {
+          var task: Runnable? = sslEngine.delegatedTask
+          while (task != null) {
+            task.run()
+            task = sslEngine.delegatedTask
+          }
+          hsStatus = sslEngine.handshakeStatus
+        }
+        SSLEngineResult.HandshakeStatus.NEED_WRAP -> {
+          netOutBuffer.clear()
+          val res = sslEngine.wrap(ByteBuffer.allocate(0), netOutBuffer)
+          netOutBuffer.flip()
+          writeFully(sc, netOutBuffer)
+          hsStatus = res.handshakeStatus
+        }
+        else -> return
       }
     }
   }
@@ -233,7 +367,9 @@ class FullDuplexSocket(
             // Initialize SSL context and engine for client mode
             sslContext = SSLContext.getInstance("TLS")
             val sslContext = sslContext!!
-            sslContext.init(null, arrayOf(trustManager), null)
+            val trustManager =
+              trustManager ?: throw SSLException("No trust manager for TLS connection")
+            sslContext.init(keyManagers, arrayOf(trustManager), null)
             sslEngine = sslContext.createSSLEngine(host, port)
             val sslEngine = sslEngine!!
             sslEngine.useClientMode = true
@@ -261,9 +397,15 @@ class FullDuplexSocket(
               register(sel, SelectionKey.OP_CONNECT)
             }
         }
+      val connectDeadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS
       while (!Thread.currentThread().isInterrupted) {
-        // blocks until an event or wakeup()
-        sel.select()
+        // blocks until an event, wakeup() or the timeout (to notice a connect that never completes)
+        sel.select(SELECT_TIMEOUT_MS)
+        val pending = channel
+        if (pending != null && !pending.isConnected && System.currentTimeMillis() > connectDeadline) {
+          // H5: servers that drop SYNs (stealth firewalls) never answer; give up instead of waiting forever.
+          throw java.io.IOException("connect timeout after ${CONNECT_TIMEOUT_MS / 1000} s")
+        }
 
         // Get selected keys
         val iter = sel.selectedKeys().iterator()
@@ -280,9 +422,17 @@ class FullDuplexSocket(
                   doHandshake(sc, sel)
                 }
 
-                // Now interested in both read and write
-                sc.register(sel, SelectionKey.OP_READ or SelectionKey.OP_WRITE)
+                // Now interested in read; write will be enabled on demand
+                sc.register(sel, SelectionKey.OP_READ)
                 emit(SocketEvent.ConnectEvent(this))
+
+                if (
+                  useTls &&
+                    ((netInBuffer?.position() ?: 0) > 0 ||
+                      (appInBuffer?.position() ?: 0) > 0)
+                ) {
+                  unwrapIncoming(sc, readBuffer)
+                }
               }
             }
 
@@ -291,29 +441,7 @@ class FullDuplexSocket(
               if (useTls) {
                 val bytesRead = sc.read(netInBuffer)
                 if (bytesRead > 0) {
-                  val netInBuffer =
-                    netInBuffer ?: throw SSLException("netInBuffer is null")
-                  val appInBuffer =
-                    appInBuffer ?: throw SSLException("appInBuffer is null")
-                  val sslEngine =
-                    sslEngine ?: throw SSLException("sslEngine is null")
-                  netInBuffer.flip()
-                  while (netInBuffer.hasRemaining()) {
-                    val res = sslEngine.unwrap(netInBuffer, appInBuffer)
-                    if (res.bytesProduced() > 0) {
-                      appInBuffer.flip()
-                      readBuffer.append(appInBuffer, appInBuffer.remaining())
-                      appInBuffer.compact()
-                    }
-                    if (
-                      res.handshakeStatus !=
-                        SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING
-                    ) {
-                      doHandshake(sc, sel)
-                    }
-                  }
-                  netInBuffer.compact()
-                  emit(SocketEvent.ReceiveEvent(readBuffer, this))
+                  unwrapIncoming(sc, readBuffer)
                 } else if (bytesRead < 0) {
                   sc.close()
                   stop()
@@ -342,28 +470,31 @@ class FullDuplexSocket(
                     netOutBuffer ?: throw SSLException("netOutBuffer is null")
                   val sslEngine =
                     sslEngine ?: throw SSLException("sslEngine is null")
-                  netOutBuffer.clear()
-                  val res = sslEngine.wrap(msg, netOutBuffer)
-                  netOutBuffer.flip()
-                  while (netOutBuffer.hasRemaining()) sc.write(netOutBuffer)
-                  if (msg.hasRemaining()) outbound.put(msg)
-                  if (
-                    res.handshakeStatus !=
-                      SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING
-                  ) {
-                    doHandshake(sc, sel)
+                  while (msg.hasRemaining()) {
+                    netOutBuffer.clear()
+                    val res = sslEngine.wrap(msg, netOutBuffer)
+                    netOutBuffer.flip()
+                    writeFully(sc, netOutBuffer)
+                    if (res.status == SSLEngineResult.Status.CLOSED) {
+                      throw SSLException("SSLEngine closed")
+                    }
+                    runHandshakeTasks(sc)
                   }
                 }
-              } else { // Drain one message at a time
-                val msg = outbound.poll()
+              } else { // Drain one message at a time, keeping the order
+                val msg = pendingWrite ?: outbound.poll()
 
                 if (msg != null) {
                   log.trace { "Writing ${msg.remaining()} bytes" }
-                  sc.write(msg) // If not fully written, put remainder back
-                  if (msg.hasRemaining()) {
-                    outbound.put(msg)
-                  }
+                  sc.write(msg)
+                  // A partial write stays at the head; the next OP_WRITE continues it.
+                  pendingWrite = if (msg.hasRemaining()) msg else null
                 }
+              }
+              if (outbound.isEmpty() && pendingWrite == null) {
+                try {
+                  key.interestOps(key.interestOps() and SelectionKey.OP_WRITE.inv())
+                } catch (_: Exception) {}
               }
             }
           }
@@ -397,27 +528,15 @@ class FullDuplexSocket(
     private val log =
       KLoggingManager.logger(FullDuplexSocket::class.java.simpleName)
 
+    private const val HANDSHAKE_TIMEOUT_MS = 15_000L
+    private const val WRITE_TIMEOUT_MS = 10_000L
+    private const val WRITE_RETRY_SLEEP_MS = 2L
+    private const val JOIN_TIMEOUT_MS = 5_000L
+    private const val CONNECT_TIMEOUT_MS = 10_000L
+    private const val SELECT_TIMEOUT_MS = 1_000L
+
 
   }
 
-  private class AllCertsTrustManager : X509TrustManager {
-    @Suppress("TrustAllX509TrustManager")
-    override fun checkServerTrusted(
-      chain: Array<X509Certificate>,
-      authType: String,
-    ) {
-
-    }
-
-    @Suppress("TrustAllX509TrustManager")
-    override fun checkClientTrusted(
-      chain: Array<X509Certificate>,
-      authType: String,
-    ) {
-
-    }
-
-    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() //
-  }
 
 }

@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import org.tfv.deskflow.logging.SafeLogText
 import org.tfv.deskflow.client.events.ClientEvent
 import org.tfv.deskflow.client.events.KeyboardEvent
 import org.tfv.deskflow.client.events.MouseEvent
@@ -167,7 +168,8 @@ class ConnectionServiceClient(
           "Bundle must contain a 'message' parameter & type cannot be null ($clazzName)"
         }
 
-        log.debug { "onMessage($clazzName) -> ClientEventBus: $message" }
+        // Only the type: a KeyboardEvent's key id is the typed character (DSK-R6).
+        log.debug { SafeLogText.incomingMessage(clazzName) }
         onClientEvent?.invoke(message)
 
       } catch (err: Exception) {
@@ -202,9 +204,7 @@ class ConnectionServiceClient(
       if (isBound)
         return true
 
-      val serviceClazz = ConnectionService::class.java
-      val intent = Intent(serviceClazz.name)
-      intent.setPackage(ctx.packageName)
+      val intent = Intent(ctx, ConnectionService::class.java)
       log.debug { "bindService: $intent" }
       isBoundStorage.store(ctx.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE))
 
@@ -217,10 +217,15 @@ class ConnectionServiceClient(
   fun unbind() {
     synchronized(this) {
 
-      val connectionService = connectionService
-      if (connectionService != null) {
-        connectionService.unregisterCallback(connectionServiceCallback)
-        ctx.unbindService(serviceConnection)
+      try {
+        connectionService?.unregisterCallback(connectionServiceCallback)
+      } catch (_: Exception) {}
+      // Unbind whenever bind() succeeded – also before onServiceConnected arrived
+      // or after the service died; otherwise the ServiceConnection leaks (code review D30).
+      if (isBound) {
+        try {
+          ctx.unbindService(serviceConnection)
+        } catch (_: IllegalArgumentException) {}
       }
       this.connectionService = null
       isBoundStorage.store(false)
@@ -251,6 +256,14 @@ class ConnectionServiceClient(
 
   override fun updateScreenState(screenState: ScreenState?): Result? {
     return connectionService?.updateScreenState(screenState)
+  }
+
+  override fun trustServer(fingerprint: String?): Result {
+    return connectionService?.trustServer(fingerprint) ?: notBoundResult()
+  }
+
+  override fun rejectServer(): Result {
+    return connectionService?.rejectServer() ?: notBoundResult()
   }
 
   override fun getState(): ConnectionState {

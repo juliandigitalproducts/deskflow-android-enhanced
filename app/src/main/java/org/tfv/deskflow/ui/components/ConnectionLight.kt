@@ -42,17 +42,18 @@ import androidx.compose.ui.unit.dp
 fun ConnectionLight(
   isConnected: Boolean,
   modifier: Modifier = Modifier,
-  size: Dp = 16.dp
+  size: Dp = 16.dp,
+  color: Color =
+    when {
+      isConnected -> MaterialTheme.colorScheme.primary
+      else -> MaterialTheme.colorScheme.error
+    },
 ) {
-  val color = when {
-    isConnected -> MaterialTheme.colorScheme.primary
-    else -> MaterialTheme.colorScheme.error
-  }
 
   Box(
     modifier = modifier
       .size(size)
       .shadow(4.dp, CircleShape)
-      .background(color)
+      .background(color, CircleShape)
   )
 }

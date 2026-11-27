@@ -42,6 +42,11 @@ class MessageParser() {
      * @param buffer The buffer to parse
      * @return The number of messages parsed
      */
+    /** Forget a half-read message (new connection). */
+    fun reset() {
+        pendingMessageSize = 0
+    }
+
     fun parseBuffer(buffer: DynamicByteBuffer): List<Message> {
         log.debug { "parse buffer size: ${buffer.size()}" }
         val inputStream = buffer.dataInputStream
@@ -53,7 +58,13 @@ class MessageParser() {
                     break
                 }
 
-                pendingMessageSize = inputStream.readInt()
+                val size = inputStream.readInt()
+                // The length comes from the server: never trust it blindly
+                // (a negative or huge value would crash or exhaust memory).
+                if (size < MIN_MESSAGE_SIZE || size > MAX_MESSAGE_SIZE) {
+                    throw InvalidMessageSizeException(size)
+                }
+                pendingMessageSize = size
                 availableSize -= Int.SIZE_BYTES
             }
 
@@ -116,5 +127,14 @@ class MessageParser() {
 
         	private val log = KLoggingManager.logger(MessageParser::class.java.simpleName)
 
+        /** Every message starts with a 4-byte code. */
+        const val MIN_MESSAGE_SIZE = 4
+
+        /** Deskflow sends clipboard data in chunks; anything larger is malformed. */
+        const val MAX_MESSAGE_SIZE = 16 * 1024 * 1024
+
     }
 }
+
+class InvalidMessageSizeException(val size: Int) :
+    java.io.IOException("Invalid message size from server: $size")

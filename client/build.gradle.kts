@@ -50,11 +50,36 @@ dependencies {
     implementation(libs.kotlin.logging.jvm)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.test {
-    useJUnitPlatform() // Required for JUnit 5
+    // JUnit 5; the slow protocol harness (fake server, keep-alive timing) runs in its own task below.
+    useJUnitPlatform { excludeTags("harness") }
     testLogging {
         events(*TestLogEvent.values())
     }
+}
+
+// Protocol harness: drives the real client against a fake Deskflow server over a local socket (docs/testing.md).
+val harnessTest by tasks.registering(Test::class) {
+    description = "Runs the protocol harness against a fake Deskflow server."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("harness") }
+    shouldRunAfter(tasks.test)
+    testLogging {
+        events(TestLogEvent.PASSED, TestLogEvent.FAILED, TestLogEvent.SKIPPED)
+        showStandardStreams = true
+    }
+}
+
+// Fake Deskflow server for the instrumented connect test on an emulator (reachable there as 10.0.2.2).
+val runFakeServer by tasks.registering(JavaExec::class) {
+    description = "Starts the fake Deskflow server on all interfaces (port 24800 or -PharnessPort=...)."
+    group = "verification"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.tfv.deskflow.client.harness.FakeDeskflowServerMainKt")
+    args(providers.gradleProperty("harnessPort").getOrElse("24800"))
 }

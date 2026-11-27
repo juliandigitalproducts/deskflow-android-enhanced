@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# .githooks/pre-push – Secret-Prüfung vor jedem Push (Vorlage: EINRICHTUNGSASSISTENT/github-publish/hooks/pre-push,
+# installiert mit github-publish/hooks-installieren.sh; core.hooksPath = .githooks).
+#
+# git ruft den Hook mit <remote-name> <remote-url> auf und liefert je Ref auf stdin:
+#   <lokaler ref> <lokale sha> <entfernter ref> <entfernte sha>
+# Geprüft wird je Ref nur, was neu ist: <entfernte sha>..<lokale sha>, bei einem neuen Ref alle Commits, die noch auf
+# keinem Ref des Remotes liegen (<lokale sha> --not --remotes=<remote>). Löschungen werden übersprungen.
+# Scanner: .githooks/secrets-scan.sh des Repos, sonst ~/Documents/AI/EINRICHTUNGSASSISTENT/github-publish/secrets-scan.sh.
+# Fund oder Werkzeugfehler → Push blockiert (Exit 1).
+# Notausgang (nur im echten Notfall, z. B. Werkzeug kaputt, Wert nachweislich harmlos): SECRETS_SCAN_UEBERSPRINGEN=1.
+set -euo pipefail
+REMOTE=${1:-}
+
+if [ "${SECRETS_SCAN_UEBERSPRINGEN:-}" = 1 ]; then
+  {
+    echo "################################################################################"
+    echo "## WARNUNG: SECRETS_SCAN_UEBERSPRINGEN=1 – Secret-Prüfung vor dem Push AUS!    ##"
+    echo "## Der CI-Job secrets-scan prüft trotzdem; Funde dort sind schon veröffentlicht. ##"
+    echo "################################################################################"
+  } >&2
+  cat > /dev/null
+  exit 0
+fi
+
+TOP=$(git rev-parse --show-toplevel)
+SCAN=""
+for s in "$TOP/.githooks/secrets-scan.sh" "$HOME/Documents/AI/EINRICHTUNGSASSISTENT/github-publish/secrets-scan.sh"; do
+  if [ -x "$s" ]; then SCAN=$s; break; fi
+done
+if [ -z "$SCAN" ]; then
+  echo "::error::pre-push: secrets-scan.sh nicht gefunden (.githooks/ bzw. EINRICHTUNGSASSISTENT/github-publish/) – Push blockiert." >&2
+  echo "  Einrichten: ~/Documents/AI/EINRICHTUNGSASSISTENT/github-publish/hooks-installieren.sh $TOP" >&2
+  exit 1
+fi
+
+null_sha() { case "$1" in *[!0]*) return 1 ;; *) return 0 ;; esac; }
+fund=0
+fehler=0
+while read -r lref lsha rref rsha; do
+  [ -n "${lsha:-}" ] || continue
+  if null_sha "$lsha"; then
+    echo "pre-push: $rref wird gelöscht – nichts zu prüfen." >&2
+    continue
+  fi
+  if ! null_sha "$rsha" && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
+    bereich="$rsha..$lsha"
+  else
+    bereich="$lsha --not --remotes=$REMOTE"
+  fi
+  echo "pre-push: prüfe $lref → $rref" >&2
+  rc=0
+  "$SCAN" historie "$bereich" "$TOP" < /dev/null || rc=$?
+  case "$rc" in
+    0) ;;
+    2) fund=1 ;;
+    *) fehler=1 ;;
+  esac
+done
+
+if [ "$fund" = 1 ]; then
+  cat >&2 <<'EOF'
+
+::error::Push blockiert: mögliche Geheimnisse in den zu pushenden Commits (Liste oben: Regel, Datei:Zeile, Commit).
+So beheben:
+  1. Wert aus der Datei entfernen. War es ein echtes Geheimnis: sofort widerrufen/erneuern – es liegt lokal in der
+     Historie und gilt als verbrannt.
+  2. Commit neu schreiben, damit der Wert auch aus der Historie verschwindet (letzter Commit: git commit --amend,
+     ältere: git rebase -i <basis>), dann erneut pushen.
+  3. Test-Werte zur Laufzeit zusammensetzen, nie realistisch aussehende Literale einchecken.
+  4. Nur bei geprüftem Fehlalarm: enge Ausnahme im Block REPO-AUSNAHMEN der .gitleaks.toml (targetRules + paths +
+     regexes) bzw. Fingerprint in .gitleaksignore (SECRETS_SCAN_FINGERPRINTS=<datei> liefert ihn).
+EOF
+  exit 1
+fi
+if [ "$fehler" = 1 ]; then
+  echo "::error::Push blockiert: Secret-Prüfung ließ sich nicht ausführen (Meldung oben)." >&2
+  exit 1
+fi
+exit 0

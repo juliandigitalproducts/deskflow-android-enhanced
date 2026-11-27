@@ -24,8 +24,27 @@
 
 package org.tfv.deskflow.client.events
 
+import org.tfv.deskflow.client.net.ConnectionFailure
+
 sealed class ConnectionEvent : ClientEvent() {
     data object Connected : ConnectionEvent()
     data object Disconnected : ConnectionEvent()
+    data object Rejected : ConnectionEvent()
+
+    /** TLS handshake stopped because the server certificate is not pinned yet. */
+    data class UntrustedServer(
+        val address: String,
+        val port: Int,
+        val fingerprint: String,
+    ) : ConnectionEvent()
+
+    /**
+     * A connection attempt failed before it was established. [consecutiveFailures] counts the attempts since the
+     * last successful connection or the last change of the server.
+     */
+    data class ConnectFailed(
+        val reason: ConnectionFailure,
+        val consecutiveFailures: Int,
+    ) : ConnectionEvent()
 
 }

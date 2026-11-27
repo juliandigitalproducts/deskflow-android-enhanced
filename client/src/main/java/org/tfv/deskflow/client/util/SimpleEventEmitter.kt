@@ -24,8 +24,12 @@
 
 package org.tfv.deskflow.client.util
 
+import java.util.concurrent.CopyOnWriteArrayList
+
 open class SimpleEventEmitter<Payload> : ISimpleEventEmitter<Payload> {
-    private val listeners = mutableListOf<(Payload) -> Unit>()
+    // Listeners are added/removed and events emitted from several threads
+    // (socket thread, connection executor, UI) – copy-on-write keeps emit() safe.
+    private val listeners = CopyOnWriteArrayList<(Payload) -> Unit>()
 
     /** Register a listener for [event]. */
     override fun on(listener: (payload: Payload) -> Unit) {

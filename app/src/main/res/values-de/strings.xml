@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- German translation (U5 from the emulator test). Names, the port placeholder and the IME name stay untranslated. -->
+<resources>
+    <string name="title_activity_settings">Deskflow-Einstellungen</string>
+
+    <string name="logo_content_desc">Logo</string>
+
+    <string name="settings_screen_screen_name_placeholder">Bildschirmname</string>
+    <string name="settings_screen_screen_address_placeholder">Hostname oder IP-Adresse</string>
+    <string name="app_prefs_screen_server_use_tls">TLS verwenden</string>
+    <string name="bottom_bar_connected">Verbunden\n%s</string>
+    <string name="bottom_bar_disconnected">Getrennt\n%s</string>
+
+    <string name="permission_dialog_title_required">Berechtigung erforderlich</string>
+    <string name="permission_dialog_title_optional">Berechtigung erteilen</string>
+    <string name="permission_dialog_dismissed_message">Deskflow kann dieses Gerät erst steuern, wenn die Bedienungshilfe aktiviert ist. Der Hinweis erscheint beim nächsten App-Start wieder.</string>
+    <string name="permission_dialog_buttons_open_settings">Einstellungen öffnen</string>
+    <string name="permission_dialog_accessibility_service_message">Die Bedienungshilfe wird gebraucht, um einen virtuellen Mauszeiger anzuzeigen, auf Tastenkürzel zu reagieren (z. B. den App-Wechsler öffnen) und Textfelder zu steuern. Ohne sie funktioniert Deskflow nicht.\n\nDatenschutz: Deskflow nutzt diesen Zugriff nur auf diesem Gerät, um die Eingaben deines Computers auszuführen. Bildschirminhalte werden nirgendwohin gesendet; Daten werden nur mit dem Deskflow-Server ausgetauscht, den du eingerichtet hast.</string>
+    <string name="settings_screen_instructions">Gib die Verbindungsdaten des Deskflow-Servers ein, der die Eingabe auf diesem Gerät steuern soll.</string>
+    <string name="settings_screen_title">Tastatur &amp; Maus verbinden</string>
+    <string name="button_cancel">Abbrechen</string>
+    <string name="untrusted_server_title">Diesem Server vertrauen?</string>
+    <string name="untrusted_server_message">%1$s ist noch nicht bekannt. Verbinde dich nur, wenn dieser Fingerabdruck mit dem übereinstimmt, den Deskflow auf deinem Computer anzeigt (Einstellungen → Sicherheit / TLS):\n\n%2$s\n\nEin anderer Fingerabdruck bedeutet, dass sich womöglich ein anderes Gerät als dein Computer ausgibt.</string>
+    <string name="untrusted_server_trust">Fingerabdruck stimmt – vertrauen</string>
+    <string name="untrusted_server_reject">Nicht verbinden</string>
+    <string name="button_save">Speichern</string>
+    <string name="button_done">Fertig</string>
+    <string name="settings_screen_screen_name_label">Bildschirmname</string>
+    <string name="settings_screen_screen_address_label">Hostname oder IP-Adresse</string>
+    <string name="settings_screen_screen_port_label">Port</string>
+    <string name="log_widget_toolbar_clear_logs">Protokoll leeren</string>
+    <string name="log_widget_toolbar_scroll_to_bottom">Nach unten scrollen</string>
+    <string name="scroll_up">Nach oben scrollen</string>
+    <string name="scroll_down">Nach unten scrollen</string>
+    <string name="log_widget_title">Protokoll</string>
+    <string name="log_widget_toolbar_filter_logs_label">Protokoll filtern</string>
+    <string name="connection_status_widget_toolbar_stop">Deskflow-Client stoppen</string>
+    <string name="connection_status_widget_title">Verbindung</string>
+    <string name="shortcuts_list_widget_title">Tastenkürzel</string>
+    <string name="app_toolbar_logo_desc">Logo</string>
+    <string name="app_toolbar_button_settings">Einstellungen</string>
+    <string name="app_toolbar_button_start">START</string>
+    <string name="app_toolbar_button_stop">STOPP</string>
+    <string name="connection_status_widget_enabled_label">Client aktiv</string>
+    <string name="connection_status_widget_enabled_value_true">LÄUFT</string>
+    <string name="connection_status_widget_enabled_value_false">GESTOPPT</string>
+    <string name="connection_status_widget_connected_label">Verbunden</string>
+    <string name="shortcuts_list_widget_global_actions">Globale Aktionen</string>
+    <string name="shortcuts_list_widget_editor_actions">Editor-Aktionen</string>
+    <string name="log_widget_no_logs">Keine aktuellen Protokolleinträge</string>
+    <string name="editor_playground_widget_title">Testfeld</string>
+    <string name="editor_playground_field_label">Testfeld</string>
+    <string name="editor_playground_instructions">In diesem Feld kannst du Tastatur und Eingabe ausprobieren.</string>
+    <string name="editor_playground_field_placeholder">Gib einen beliebigen Text ein …</string>
+    <string name="connection_status_widget_header_status_connecting">Verbinde …</string>
+    <string name="connection_status_widget_header_status_connected">Verbunden</string>
+    <string name="connection_status_widget_header_status_stopped">Gestoppt</string>
+    <string name="connection_status_widget_header_status_tls_failed">TLS-Fehler</string>
+    <string name="connection_status_widget_header_status_unreachable">Nicht erreichbar</string>
+    <string name="connection_status_widget_header_status_failed">Verbindungsfehler</string>
+    <string name="connection_status_error_tls">TLS-Handshake fehlgeschlagen. Ist TLS in Deskflow auf dem Computer aktiv? TLS muss auf beiden Seiten an (oder aus) sein. Fehlgeschlagene Versuche: %1$d</string>
+    <string name="connection_status_error_unreachable">Server nicht erreichbar. Prüfe Adresse und Port und ob Deskflow auf dem Computer im selben Netzwerk läuft. Fehlgeschlagene Versuche: %1$d</string>
+    <string name="connection_status_error_other">Verbindung fehlgeschlagen, Deskflow versucht es weiter. Fehlgeschlagene Versuche: %1$d</string>
+    <string name="app_toolbar_status_desc">Verbindungsstatus: %1$s</string>
+    <string name="global_input_service_notification_channel_description">Benachrichtigungen zur Deskflow-Eingabe</string>
+    <string name="global_input_service_notification_ime_not_setup">Die Deskflow-Tastatur ist gerade nicht aktiv.</string>
+    <string name="global_input_service_notification_action_open_keyboard_settings">Tastatureinstellungen öffnen</string>
+    <string name="toast_settings_saved">Einstellungen gespeichert.</string>
+    <string name="permission_dialog_notifications_message">Erlaube Benachrichtigungen, damit Deskflow dich über Verbindung und Zwischenablage informieren kann.</string>
+    <string name="permission_dialog_buttons_dismiss">Ignorieren</string>
+    <string name="permission_dialog_buttons_later">Später</string>
+    <string name="permission_dialog_ime_enabled_message">Um Deskflow zu nutzen, aktiviere die Deskflow-Tastatur in den Einstellungen.\n\nHinweis: Während einer Verbindung schaltet Deskflow beim Öffnen eines Textfelds auf die Deskflow-Tastatur um, damit deine Eingaben am Computer hier ankommen. Über den Tastatur-Umschalter kannst du jederzeit zurückwechseln.</string>
+
+    <string name="settings_screen_auto_discover_label">Server automatisch finden</string>
+    <string name="settings_screen_auto_discover_description">Sucht im lokalen Netzwerk nach einem Deskflow-Server (z. B. deinem Mac) und verbindet sich damit, ganz ohne Hostname oder IP-Adresse.</string>
+    <string name="settings_screen_discover_button">Netzwerk durchsuchen</string>
+    <string name="settings_screen_discover_none_found">Kein Deskflow-Server gefunden. Prüfe, ob der Server läuft und beide Geräte im selben Netzwerk sind.</string>
+    <string name="settings_screen_clipboard_sync_label">Zwischenablage mit dem Computer teilen</string>
+    <string name="settings_screen_clipboard_sync_description">Kopierter Text wird an den verbundenen Computer gesendet, und dort kopierter Text kommt hier an. Inhalte, die Apps als vertraulich markieren (z. B. Passwörter), werden nie gesendet.</string>
+    <string name="settings_screen_scrolling_title">Scrollen</string>
+    <string name="settings_screen_scroll_invert_y_label">Vertikales Scrollen umkehren (Y-Achse)</string>
+    <string name="settings_screen_scroll_invert_x_label">Horizontales Scrollen umkehren (X-Achse)</string>
+    <string name="settings_screen_scroll_invert_description">Nutze diese Schalter, wenn sich der Inhalt beim Scrollen in die falsche Richtung bewegt (z. B. bei natürlichem Scrollen unter macOS).</string>
+    <string name="settings_screen_scroll_speed_label">Scroll-Geschwindigkeit: %1$d %%</string>
+    <string name="settings_screen_tls_fingerprint_label">TLS-Fingerabdruck dieses Geräts. Beim ersten Verbinden fragt die Deskflow-App auf dem Server (z. B. deinem Mac), ob du ihm vertraust – vergleichen und bestätigen:</string>
+    <string name="settings_screen_scroll_mode_label">Scroll-Modus</string>
+    <string name="settings_screen_scroll_mode_finger">1. Virtueller Finger</string>
+    <string name="settings_screen_scroll_mode_finger_description">Ein Finger bleibt auf dem Bildschirm und folgt dem Trackpad direkt.</string>
+    <string name="settings_screen_scroll_mode_swipes">2. Kurze Wischgesten</string>
+    <string name="settings_screen_scroll_mode_swipes_description">Scrollbewegungen werden kurz gesammelt und als kurze Wischgesten nacheinander ausgeführt.</string>
+    <string name="settings_screen_scroll_mode_flick">3. Schwung</string>
+    <string name="settings_screen_scroll_mode_flick_description">Eine Wischgeste mit Schwung pro Scrollbewegung, wie beim Anstoßen mit dem Finger.</string>
+    <string name="settings_screen_scroll_mode_steps">4. Feste Schritte</string>
+    <string name="settings_screen_scroll_mode_steps_description">Gleichmäßige, ruhige Schritte ohne Schwung.</string>
+    <string name="settings_screen_scroll_mode_page">5. Seitenweise (ohne Gesten)</string>
+    <string name="settings_screen_scroll_mode_page_description">Bittet die scrollbare Ansicht unter dem Zeiger, zu scrollen. Sehr stabil, aber in großen Sprüngen.</string>
+    <string name="settings_screen_scroll_smoothing_label">Glättung: %1$d %%</string>
+    <string name="settings_screen_scroll_smoothing_description">Höher ist flüssiger, reagiert aber etwas später. Wirkt in den Modi 1–3 (und auf die Pause zwischen den Seiten in Modus 5).</string>
+    <string name="settings_screen_plaintext_warning">Ohne TLS wird alles unverschlüsselt gesendet: Jeder im selben Netzwerk könnte die geteilte Zwischenablage mitlesen oder Eingaben an dieses Gerät senden. Schalte TLS in Deskflow auf dem Computer und hier ein.</string>
+    <string name="settings_screen_forget_trusted_servers">Vertraute Server-Zertifikate vergessen (%1$d)</string>
+</resources>

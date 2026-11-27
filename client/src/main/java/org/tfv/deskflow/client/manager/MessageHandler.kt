@@ -31,6 +31,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import org.tfv.deskflow.client.ClientEventBus
 import org.tfv.deskflow.client.events.ClientEvent
+import org.tfv.deskflow.client.events.ConnectionEvent
 import org.tfv.deskflow.client.events.KeyboardEvent
 import org.tfv.deskflow.client.events.MessagesEvent
 import org.tfv.deskflow.client.events.MouseEvent
@@ -44,20 +45,37 @@ import org.tfv.deskflow.client.util.logging.KLoggingManager
 class MessageHandler(
   private val socket: FullDuplexSocket,
   private val target: ServerTarget,
+  /** DSK-R3: false while clipboard sharing is off – incoming clipboard data is then not collected at all. */
+  private val clipboardReceiveEnabled: () -> Boolean = { true },
 ) : AbstractDisposable() {
 
   @Volatile
   var isScreenActive: Boolean = false
     private set
 
-  private var keepAliveServerTimestamp: Long = 0L
+  // Written by the message thread (CALV), read by the keep-alive check on the scheduler thread.
+  @Volatile private var keepAliveServerTimestamp: Long = 0L
   private var keepAliveFuture: ScheduledFuture<Void>? = null
 
   val screenName: String
     get() = target.screenName
 
+  /** Set when the screen changed size after connecting (rotation); otherwise the size of [target]. */
+  @Volatile private var screenSizeOverride: Pair<Int, Int>? = null
+
   val screenSize: Pair<Int, Int>
-    get() = Pair(target.width, target.height)
+    get() = screenSizeOverride ?: Pair(target.width, target.height)
+
+  /**
+   * H2: the screen was rotated/resized while connected. The server learns the new shape through a DINF, so
+   * absolute positions and the switching edge match again – without dropping the connection.
+   */
+  fun updateScreenSize(width: Int, height: Int) {
+    if (screenSize == Pair(width, height)) return
+    screenSizeOverride = Pair(width, height)
+    log.info { "Screen size changed to ${width}x$height, sending DINF" }
+    sendMessage(getInfoMessage())
+  }
 
   private val clipboardReceiveManager = ClipboardReceiveManager()
 
@@ -80,16 +98,16 @@ class MessageHandler(
 
   /** Called on dispose to clean up resources. */
   override fun onDispose() {
-    synchronized(this) {
+    // M11: stop under the lock, but wait outside of it – the tasks being stopped need the same lock, so waiting
+    // inside blocked the reconnect for up to 2 × 5 s.
+    val executors = synchronized(this) {
       ClientEventBus.off(this::onClientEvent)
       cancelKeepAliveCheck(true)
       listOf(scheduledExecutor, messageExecutor)
         .filter { !it.isShutdown }
-        .forEach {
-          it.shutdownNow()
-          it.awaitTermination(5, TimeUnit.SECONDS)
-        }
+        .onEach { it.shutdownNow() }
     }
+    executors.forEach { it.awaitTermination(2, TimeUnit.SECONDS) }
   }
 
   private val isConnected: Boolean
@@ -118,17 +136,18 @@ class MessageHandler(
   }
 
   private fun handle(message: Message) {
-    log.trace { "Received message: $message" }
+    log.trace { "Received message: ${message.type}" }
     when (message) {
       is HelloMessage -> {
         log.trace { "Hello message: $message" }
-        val helloBackMessage = HelloBackMessage(1, 6, screenName)
-
-        sendMessage(helloBackMessage)
+        answerHello(message.majorVersion, message.minorVersion)
       }
 
+      // M4: servers that use the protocol name "Synergy" (instead of "Barrier") send their hello in this shape.
+      // It was ignored before, so the connection hung until the retry without any error.
       is HelloBackMessage -> {
-        log.warn { "Should not be received by the client ${message.type}" }
+        if (message.name.isBlank()) answerHello(message.majorVersion, message.minorVersion)
+        else log.warn { "Should not be received by the client ${message.type}" }
       }
 
       is KeepAliveMessage -> {
@@ -176,7 +195,7 @@ class MessageHandler(
         }
 
         ClipboardSendManager.receivedSequenceNumber(message.sequenceNumber)
-        if (isScreenActive) clipboardReceiveManager.submitMessage(message)
+        if (isScreenActive && clipboardReceiveEnabled()) clipboardReceiveManager.submitMessage(message)
         else clipboardReceiveManager.reset()
       }
 
@@ -255,17 +274,24 @@ class MessageHandler(
       }
 
       is IncompatibleMessage -> {
-        log.error { "Needs to be implemented: ${message.type.name}" }
+        reject("The server uses an incompatible protocol version, update Deskflow on the server.")
       }
 
       is BusyMessage -> {
-          log.warn { "BUSY MESSAGE RECEIVED, RESET CONNECTION??" }
-      //log.warn { "BUSY MESSAGE RECEIVED, RESETTING CONNECTION" }
-        //socket.dispose()
+        reject(
+          "The server refused the screen name \"$screenName\": a computer with this name is " +
+            "already connected. Make sure the server computer itself (e.g. your Mac) has a " +
+            "different name and no other device uses \"$screenName\", or change the screen " +
+            "name in the app.",
+        )
       }
 
       is UnknownMessage -> {
-        log.error { "Needs to be implemented: ${message.type.name}" }
+        reject(
+          "The server does not know the screen name \"$screenName\". In the Deskflow app on " +
+            "the server open \"Configure Server\", drag a new computer into the layout & " +
+            "name it exactly \"$screenName\".",
+        )
       }
 
       is BadMessage -> {
@@ -276,6 +302,21 @@ class MessageHandler(
         log.warn { "Unknown message type: ${message.type.name}" }
       }
     }
+  }
+
+  /** Answers the server's hello with protocol 1.6; a server with another major version cannot work with us. */
+  private fun answerHello(major: Int, minor: Int) {
+    if (major != 1) {
+      reject("server speaks protocol $major.$minor, this client supports 1.x")
+      return
+    }
+    sendMessage(HelloBackMessage(1, 6, screenName))
+  }
+
+  private fun reject(hint: String) {
+    log.error { "Connection rejected by server: $hint" }
+    ClientEventBus.emit(ConnectionEvent.Rejected)
+    socket.close()
   }
 
   fun getInfoMessage(): InfoMessage {

@@ -73,6 +73,9 @@ fun readVersionProperties(project: Project): Pair<String, Int> {
     }
   val versionName = versionParts.joinToString(separator = ".")
   val (major, minor, patch) = versionParts.map { it.toInt() }
+  // versionCode = M·10000 + mm·100 + pp: two digits each, otherwise codes collide or go backwards
+  // (code review D33).
+  require(minor in 0..99 && patch in 0..99) { "minor and patch must be 0..99 (got $versionName)" }
   val versionCode = String.format("%d%02d%02d", major, minor, patch).toInt(10)
   project.logger.info(
     "Resolved (version=$versionName,versionCode=$versionCode)"

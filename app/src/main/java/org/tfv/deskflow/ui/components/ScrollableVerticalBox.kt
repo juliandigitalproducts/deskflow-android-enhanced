@@ -54,6 +54,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -61,6 +62,7 @@ import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import org.tfv.deskflow.R
 import org.tfv.deskflow.ui.components.preview.PreviewAppState
 import org.tfv.deskflow.ui.components.preview.PreviewDeskflowThemedRoot
 
@@ -119,7 +121,7 @@ fun ScrollableVerticalBox(
       if (scrollState.canScrollBackward) {
         Icon(
           imageVector = Icons.Default.KeyboardArrowUp,
-          contentDescription = "Scroll up",
+          contentDescription = stringResource(R.string.scroll_up),
           modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).clickable {
             coroutineScope.launch {
               scrollState.animateScrollBy(-scrollDelta)
@@ -131,7 +133,7 @@ fun ScrollableVerticalBox(
       if (scrollState.canScrollForward) {
         Icon(
           imageVector = Icons.Default.KeyboardArrowDown,
-          contentDescription = "Scroll down",
+          contentDescription = stringResource(R.string.scroll_down),
           modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp)
             .clickable {
               coroutineScope.launch {

@@ -29,6 +29,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -43,6 +44,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,13 +53,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.tfv.deskflow.R
 import org.tfv.deskflow.ui.theme.LocalDeskflowExtendedColorScheme
+
+const val TOOLBAR_STATUS_TEST_TAG = "toolbar_connection_status"
 
 @Composable
 fun AppToolbar(appState: IAppState = LocalAppState.current) {
@@ -85,12 +92,11 @@ fun AppToolbar(appState: IAppState = LocalAppState.current) {
             .fillMaxHeight(),
       ) {
         Image(
-          painter = when {
-            isXL && !isPortrait -> painterResource(id = R.drawable.deskflow_logo)
-            else -> painterResource(id = R.drawable.deskflow_icon_fit)
-                         },
+          // Own app logo glyph (art/brand/), tinted to the toolbar colour; no Deskflow logo.
+          painter = painterResource(id = R.drawable.app_logo_glyph),
           contentDescription = stringResource(R.string.app_toolbar_logo_desc),
-          modifier = Modifier.height(32.dp),
+          colorFilter = ColorFilter.tint(LocalContentColor.current),
+          modifier = Modifier.size(40.dp),
         )
         Spacer(modifier = Modifier.weight(1f))
 
@@ -121,7 +127,7 @@ fun AppToolbar(appState: IAppState = LocalAppState.current) {
           ) {
             Icon(
               imageVector = Icons.Default.Settings,
-              contentDescription = "Settings",
+              contentDescription = stringResource(R.string.app_toolbar_button_settings),
             )
           }
 
@@ -152,8 +158,25 @@ fun AppToolbar(appState: IAppState = LocalAppState.current) {
               modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            //if (appState.isEnabled)
-            //  ConnectionLight(isConnected)
+            // U7: the button only says whether the client runs; the light shows whether it is connected.
+            if (appState.isEnabled) {
+              val status = connectionState.toConnectionStatus()
+              val statusText = stringResource(status.label)
+              val description = stringResource(R.string.app_toolbar_status_desc, statusText)
+              ConnectionLight(
+                isConnected = isConnected,
+                size = 10.dp,
+                color =
+                  when {
+                    status == ConnectionStatus.CONNECTED -> extColorScheme.success
+                    status.isError -> MaterialTheme.colorScheme.error
+                    else -> extColorScheme.warning
+                  },
+                modifier =
+                  Modifier.semantics { contentDescription = description }
+                    .testTag(TOOLBAR_STATUS_TEST_TAG),
+              )
+            }
 
           }
         }

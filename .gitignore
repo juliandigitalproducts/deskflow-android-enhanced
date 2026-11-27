@@ -9,3 +9,14 @@ release
 *.aar
 
 local.properties
+# Signing keys and their passwords never belong in git (code review D22).
+*.jks
+*.keystore
+*.keystore.properties
+!app/deskflow-shared-debug.keystore
+*.p12
+# Test fixture for the TLS pinning tests (self-signed, test only).
+!client/src/test/resources/test-server.p12
+
+# macOS
+.DS_Store

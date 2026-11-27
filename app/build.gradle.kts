@@ -23,6 +23,7 @@
  */
 
 import com.android.ddmlib.AndroidDebugBridge
+import java.util.Properties
 import com.google.protobuf.gradle.id
 import com.google.protobuf.gradle.proto
 
@@ -32,8 +33,6 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.protobuf)
-  alias(libs.plugins.hilt)
-  alias(libs.plugins.ksp)
 }
 
 protobuf {
@@ -60,13 +59,61 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "org.tfv.deskflow"
+    // Own application id (code review D18): the upstream id "org.tfv.deskflow" collided with
+    // the original app. The Kotlin package/namespace stays org.tfv.deskflow.
+    applicationId = "de.juliandigitalproducts.deskflow"
     minSdk = 34
+    targetSdk = 36
 
     versionCode = projectVersionCode
     versionName = projectVersionName
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     vectorDrawables.useSupportLibrary = true
+
+    ndk { abiFilters += listOf("arm64-v8a") }
+  }
+
+  // Release signing (code review D2, same model as EV Trigger Flows/BlackMyData): DESKFLOW_KEYSTORE_* env vars
+  // (CI secrets) or ../deskflow-release.keystore.properties next to this repository. Without a
+  // key the release build stops instead of silently signing with the public debug key – anyone with
+  // that key could ship an "update" that keeps the accessibility permission.
+  val keyProps = Properties()
+  rootProject.file("../deskflow-release.keystore.properties").takeIf { it.exists() }
+    ?.inputStream()?.use { keyProps.load(it) }
+  fun releaseKey(env: String, prop: String): String? =
+    System.getenv(env)?.takeIf { it.isNotBlank() } ?: keyProps.getProperty(prop)
+  val releaseStoreFile = releaseKey("DESKFLOW_KEYSTORE_FILE", "storeFile")
+  // Shared debug key: debug builds only, so debug builds from different machines update each other.
+  // It is a public key (releases up to v1.0.15 were wrongly signed with it) and is not published on
+  // GitHub; without the file, debug builds use the standard Android debug keystore (~/.android/debug.keystore).
+  val sharedDebugKeystore = file("deskflow-shared-debug.keystore")
+  signingConfigs {
+    if (sharedDebugKeystore.exists()) {
+      getByName("debug") {
+        storeFile = sharedDebugKeystore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
+    }
+    if (!releaseStoreFile.isNullOrBlank()) {
+      create("release") {
+        storeFile = file(releaseStoreFile)
+        storePassword = releaseKey("DESKFLOW_KEYSTORE_PASSWORD", "storePassword")
+        keyAlias = releaseKey("DESKFLOW_KEY_ALIAS", "keyAlias")
+        keyPassword = releaseKey("DESKFLOW_KEY_PASSWORD", "keyPassword")
+      }
+    }
+  }
+  if (releaseStoreFile.isNullOrBlank()) {
+    gradle.taskGraph.whenReady {
+      if (allTasks.any { it.name.contains("Release") && (it.name.startsWith("package") || it.name.startsWith("bundle")) }) {
+        throw GradleException(
+          "No Deskflow release key: set DESKFLOW_KEYSTORE_FILE/_PASSWORD, DESKFLOW_KEY_ALIAS/_PASSWORD " +
+            "or create ../deskflow-release.keystore.properties (see README → Release signing)."
+        )
+      }
+    }
   }
   buildFeatures {
     buildConfig = true
@@ -82,7 +129,10 @@ android {
       buildConfigField("boolean", "DEBUG", "true")
     }
     release {
-      isMinifyEnabled = false
+      if (!releaseStoreFile.isNullOrBlank()) signingConfig = signingConfigs.getByName("release")
+      // R8 on (code review D23); keep rules for reflection/IPC in proguard-rules.pro.
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(
         getDefaultProguardFile("proguard-android-optimize.txt"),
         "proguard-rules.pro",
@@ -123,9 +173,10 @@ android {
     targetCompatibility = JavaVersion.VERSION_17
   }
   kotlinOptions { jvmTarget = "17" }
+  // F-Droid rejects the encrypted dependency block in the APK signing block.
   dependenciesInfo {
-    includeInApk = true
-    includeInBundle = true
+    includeInApk = false
+    includeInBundle = false
   }
 
   sourceSets { getByName("main") { proto { srcDir("src/main/proto") } } }
@@ -138,7 +189,6 @@ dependencies {
 
   implementation(libs.arrow.core)
   implementation(libs.arrow.fx.coroutines)
-  implementation(project(":iconics-typeface-library"))
 
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.kotlin.logging.android)
@@ -148,10 +198,6 @@ dependencies {
 
   implementation(libs.protobuf.kotlin)
 
-  ksp(libs.hilt.compiler)
-  kspTest(libs.hilt.compiler)
-  implementation(libs.hilt.core)
-  implementation(libs.hilt.android)
 
   implementation(libs.google.accompanist.permissions)
 
@@ -168,7 +214,6 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.normal)
   implementation(libs.androidx.lifecycle.viewmodel.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
-  implementation(libs.androidx.hilt.navigation.compose)
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.lifecycle.process)
   implementation(libs.androidx.lifecycle.service)
@@ -202,6 +247,7 @@ tasks.register("installDebugEnableAccessibilityService") {
   val ops = project.objects.newInstance<InjectedOps>()
   val execOps: ExecOperations = ops.execOps
 
+  val appId = android.defaultConfig.applicationId!!
   doLast {
     val adbPath = "${android.sdkDirectory}/platform-tools/adb"
 
@@ -238,11 +284,8 @@ tasks.register("installDebugEnableAccessibilityService") {
           "-s",
           device.serialNumber,
           "shell",
-          "settings",
-          "put",
-          "secure",
-          "enabled_accessibility_services",
-          "\"org.tfv.deskflow/org.tfv.deskflow.services.GlobalInputService\"",
+          // Append instead of replacing the list of enabled accessibility services.
+          ADD_A11Y_SERVICE_SCRIPT.replace("APP_ID", appId),
         )
       }
       execOps.exec {
@@ -254,7 +297,7 @@ tasks.register("installDebugEnableAccessibilityService") {
           "am",
           "start",
           "-n",
-          "org.tfv.deskflow/org.tfv.deskflow.ui.activities.RootActivity",
+          "$appId/org.tfv.deskflow.ui.activities.RootActivity",
         )
       }
     }
@@ -289,15 +332,17 @@ class RenameAABAction : Action<Task> {
       val bundlePath = "${buildDir}/outputs/${outputFolder}/${flavor}/"
       val readyPath =
         file("${buildDir}/outputs/${outputFolder}-ready/${flavor}/")
-      val defaultAppBundleFilename = "app-${flavor}${if (isAssemble) "-unsigned" else ""}.$ext"
-      val appBundleFilename = "DeskflowAndroid-v$projectVersionName.$ext"
+      // Signed builds are written as app-<flavor>.apk, unsigned ones as app-<flavor>-unsigned.apk.
+      val defaultAppBundleFilenames =
+        if (isAssemble) listOf("app-${flavor}.$ext", "app-${flavor}-unsigned.$ext") else listOf("app-${flavor}.$ext")
+      val appBundleFilename = "Deskflow-Android-Enhanced-$projectVersionName.$ext"
       readyPath.mkdirs()
-      
+
       tasks.register<Copy>(renameTaskName) {
         from(bundlePath)
-        include(defaultAppBundleFilename)
+        include(defaultAppBundleFilenames)
         destinationDir = readyPath
-        rename(defaultAppBundleFilename, appBundleFilename)
+        rename { appBundleFilename }
       }
 
       task.finalizedBy(renameTaskName)
@@ -306,3 +351,11 @@ class RenameAABAction : Action<Task> {
 }
 
 tasks.whenTaskAdded(RenameAABAction())
+
+private val ADD_A11Y_SERVICE_SCRIPT =
+  "svc=APP_ID/org.tfv.deskflow.services.GlobalInputService; " +
+    "cur=$(settings get secure enabled_accessibility_services); " +
+    "case \":\$cur:\" in *\":\$svc:\"*) ;; *) " +
+    "if [ -z \"\$cur\" ] || [ \"\$cur\" = null ]; then new=\$svc; else new=\"\$cur:\$svc\"; fi; " +
+    "settings put secure enabled_accessibility_services \"\$new\" ;; esac; " +
+    "settings put secure accessibility_enabled 1"

@@ -173,9 +173,12 @@ class DynamicByteBuffer(
         synchronized(mutationLock) {
             val count = read(dest, length, offset)
             if (count > 0) {
-                System.arraycopy(buf, readPos, buf, offset, capacity - count)
+                // M2: move only the bytes still unread, not the whole capacity (it can be 32 MiB after a large
+                // clipboard, and this runs for every message, even for every byte of readInt()).
+                System.arraycopy(buf, readPos, buf, offset, (writePos - readPos).coerceAtLeast(0))
                 readPos -= count
                 writePos -= count
+                shrinkIfEmpty()
             }
             return count
         }
@@ -184,9 +187,10 @@ class DynamicByteBuffer(
         synchronized(mutationLock) {
             val data = read(length, offset)
             if (data.isNotEmpty()) {
-                System.arraycopy(buf, readPos, buf, offset, capacity - readPos)
+                System.arraycopy(buf, readPos, buf, offset, (writePos - readPos).coerceAtLeast(0))
                 readPos -= data.size
                 writePos -= data.size
+                shrinkIfEmpty()
             }
             return data
         }
@@ -199,7 +203,19 @@ class DynamicByteBuffer(
         synchronized(mutationLock) {
             readPos = 0
             writePos = 0
+            shrinkIfEmpty()
         }
+    }
+
+    /** Gives a buffer that grew for one large message back to the system once it is empty again. */
+    private fun shrinkIfEmpty() {
+        if (writePos == 0 && readPos == 0 && buf.size > SHRINK_ABOVE) buf = ByteArray(initialSize)
+    }
+
+    private val initialSize = initialCapacity.coerceAtLeast(1)
+
+    private companion object {
+        const val SHRINK_ABOVE = 256 * 1024
     }
 
 
@@ -214,7 +230,9 @@ class DynamicByteBuffer(
             return synchronized(buffer.mutationLock) {
                 if (buffer.availableReadSize > 0) {
                     val data = buffer.pop(1)
-                    data[0].toInt()
+                    // InputStream.read() must return 0..255; a signed byte ≥ 0x80
+                    // would look like -1 (EOF) to DataInputStream.
+                    data[0].toInt() and 0xFF
                 } else -1
             }
         }

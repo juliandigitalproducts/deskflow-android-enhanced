@@ -125,6 +125,9 @@ open class GlobalKeyboardManager(
       return
     }
 
+    // H4: a shortcut fires once, on key down – not again on key up or auto-repeat (Back twice, Recents open+close).
+    if (event.type != KeyboardEvent.Type.Down) return
+
     val state = editableState.value
     val shortcut = ShortcutKey(event.id.toInt(), state.modifierKeys)
     val action =
@@ -149,6 +152,16 @@ open class GlobalKeyboardManager(
 
   open fun process(event: KeyboardEvent) {
     executor.submit<Unit> { processInternal(event) }
+  }
+
+  /**
+   * H3: forget pressed modifiers. Called when the cursor leaves this screen or the connection ends – the key-up of
+   * a held Cmd/Ctrl then never arrives, and a later plain Tab would still count as Cmd+Tab.
+   */
+  fun resetModifiers() {
+    executor.submit<Unit> {
+      mutateState { state, _ -> state.copy(modifierKeys = org.tfv.deskflow.types.ModifierKeys()) }
+    }
   }
 
   fun dumpSystemActions() {

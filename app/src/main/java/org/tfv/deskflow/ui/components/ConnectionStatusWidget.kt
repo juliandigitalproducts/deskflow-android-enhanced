@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +59,17 @@ import org.tfv.deskflow.ext.adjustBrightness
 import org.tfv.deskflow.ui.components.preview.PreviewAppState
 import org.tfv.deskflow.ui.components.preview.PreviewDeskflowThemedRoot
 import org.tfv.deskflow.ui.theme.LocalDeskflowExtendedColorScheme
+
+const val CONNECTION_ERROR_TEST_TAG = "connection_error"
+
+fun ConnectionState.toConnectionStatus(): ConnectionStatus =
+  ConnectionStatusPolicy.of(
+    isEnabled = isEnabled,
+    isConnected = isConnected,
+    awaitingTrust = pendingFingerprint != null,
+    failureKind = failureKind,
+    failedAttempts = failedAttempts,
+  )
 
 @Composable
 fun ConnectionStatusLabel(
@@ -74,32 +86,20 @@ fun ConnectionStatusLabel(
     )
   )
 
+  val status = connState.toConnectionStatus()
   val (statusColor, statusShadowColor) = when {
-    !connState.isEnabled ->
+    status == ConnectionStatus.STOPPED ->
       MaterialTheme.colorScheme.errorContainer
-    connState.isConnected ->
+    status == ConnectionStatus.CONNECTED ->
       extColorScheme.success
+    status.isError -> MaterialTheme.colorScheme.error
     else -> extColorScheme.warning
   }.let { color ->
     Pair(color.copy(alpha = glowAlpha), color.adjustBrightness(-0.4f).copy(alpha = glowAlpha))
   }
 
   Text(
-    text =
-      when {
-        !connState.isEnabled ->
-          stringResource(
-            R.string.connection_status_widget_header_status_stopped
-          )
-        connState.isConnected ->
-          stringResource(
-            R.string.connection_status_widget_header_status_connected
-          )
-        else ->
-          stringResource(
-            R.string.connection_status_widget_header_status_connecting
-          )
-      }.uppercase(),
+    text = stringResource(status.label).uppercase(),
     style =
       MaterialTheme.typography.titleSmall.copy(
         //fontStyle = FontStyle.Italic,
@@ -109,9 +109,10 @@ fun ConnectionStatusLabel(
     overflow = TextOverflow.Ellipsis,
     color =
       when {
-        !connState.isEnabled -> MaterialTheme.colorScheme.onErrorContainer
-        connState.isConnected ->
+        status == ConnectionStatus.STOPPED -> MaterialTheme.colorScheme.onErrorContainer
+        status == ConnectionStatus.CONNECTED ->
           extColorScheme.onSuccess
+        status.isError -> MaterialTheme.colorScheme.onError
         else -> extColorScheme.onWarning
       },
     modifier =
@@ -161,6 +162,18 @@ fun ConnectionStatusWidget(
       }
     },
   ) {
+    val detail = connState.toConnectionStatus().detail
+    if (detail != null) {
+      Text(
+        text = stringResource(detail, connState.failedAttempts),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.error,
+        modifier =
+          Modifier.fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag(CONNECTION_ERROR_TEST_TAG),
+      )
+    }
   }
 }
 

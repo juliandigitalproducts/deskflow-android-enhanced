@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.update
 import org.tfv.deskflow.client.util.logging.KLoggingManager
 import org.tfv.deskflow.data.aidl.ConnectionState
 import org.tfv.deskflow.data.aidl.ServerState
+import org.tfv.deskflow.client.net.ConnectionFailure
 import org.tfv.deskflow.data.models.AppPrefs
 import org.tfv.deskflow.ext.ConnectionStateDefaults
 import org.tfv.deskflow.ext.copy
@@ -65,13 +66,21 @@ class ConnectionStateModel(private val context: Context) {
         currentServer.address == appPrefs.screen.server.address &&
         currentServer.port == appPrefs.screen.server.port &&
         currentServer.useTls == appPrefs.screen.server.useTls &&
+        currentServer.autoDiscover == !appPrefs.screen.server.autoDiscoverDisabled &&
         currentScreen.name == appPrefs.screen.name) {
         
         log.debug { "AppPrefs are unchanged" }
         return@updateState currentState
       }
 
+      val serverChanged =
+        currentServer.address != appPrefs.screen.server.address ||
+          currentServer.port != appPrefs.screen.server.port ||
+          currentServer.useTls != appPrefs.screen.server.useTls
       currentState.copy(
+        // A new server starts without the error of the old one (U3).
+        failureKind = if (serverChanged) ConnectionFailure.NONE_CODE else currentState.failureKind,
+        failedAttempts = if (serverChanged) 0 else currentState.failedAttempts,
         screen =
           currentScreen.copy(
             name = appPrefs.screen.name,
@@ -82,10 +91,21 @@ class ConnectionStateModel(private val context: Context) {
                 address = appPrefs.screen.server.address
                 port = appPrefs.screen.server.port
                 useTls = appPrefs.screen.server.useTls
+                autoDiscover = !appPrefs.screen.server.autoDiscoverDisabled
               }
           )
       )
 
+    }
+  }
+
+  /** Re-reads the display size (rotation, fold, resolution change). */
+  fun updateScreenSize() {
+    updateState { currentState ->
+      val size = context.getScreenSize()
+      val screen = currentState.screen
+      if (screen.width == size.px.width && screen.height == size.px.height) return@updateState currentState
+      currentState.copy(screen = screen.copy(width = size.px.width, height = size.px.height))
     }
   }
 

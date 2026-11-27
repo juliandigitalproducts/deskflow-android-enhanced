@@ -20,4 +20,6 @@ interface IConnectionService {
         Result setClipboardData(in Bundle bundle);
 
         ConnectionState getState();
+        Result trustServer(in String fingerprint);
+        Result rejectServer();
 }

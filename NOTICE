@@ -1,0 +1,29 @@
+Deskflow Android (Enhanced)
+Copyright (C) 2026 juliandigitalproducts
+
+License: GNU General Public License, version 2 (see COPYING and LICENSE.md).
+
+This project is a fork of deskflow-android by Jonathan Glanz
+(https://github.com/jglanz/deskflow-android). Jonathan Glanz's own files were
+published under the MIT License and keep it (see LICENSE.md).
+
+The client's protocol layer goes back to synergy-android by Shaun Patterson and
+the Synergy/Deskflow project (Copyright (C) 2002 Chris Schoeneman, 2009 The
+Deskflow+ Project, 2010 The Deskflow Project, 2010 Shaun Patterson), licensed
+under the GNU General Public License version 2. deskflow-android had replaced
+the GPL notices of these files with MIT notices; this fork restored the
+original notices (38 files, listed in LICENSE.md and kept unchanged). Because of these files the
+work as a whole is distributed under the GPL version 2.
+
+Known license issue: the GPL files are GPL-2.0-only, while the APK bundles
+libraries under the Apache License 2.0 (AndroidX, Jetpack Compose, Material,
+Kotlin standard library, kotlinx, Arrow, kotlin-logging and others), which the
+Free Software Foundation considers incompatible with GPL version 2. This was
+inherited unchanged from upstream; the risk is accepted and disclosed. Details:
+LICENSE.md, section "Known license issue".
+
+The app logo (art/brand/) is an own design, not the Deskflow logo.
+
+Trademarks: this is an unofficial, independent client. It is not affiliated
+with, endorsed by or sponsored by the Deskflow project or Symless. "Deskflow"
+and "Synergy" are used only to name the software this client works with.

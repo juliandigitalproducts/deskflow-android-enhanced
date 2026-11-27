@@ -1,3 +1,0 @@
--keep class org.tfv.deskflow.android.iconics.fontawesomepro.FontAwesomeProRegular { *; }
--keep class org.tfv.deskflow.android.iconics.fontawesomepro.FontAwesomeProSolid { *; }
--keep class org.tfv.deskflow.android.iconics.fontawesomepro.FontAwesomeProLight { *; }

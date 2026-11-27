@@ -1,0 +1,8 @@
+<!-- SPDX-License-Identifier: MIT · Copyright (c) 2026 juliandigitalproducts · Deskflow Android Enhanced app logo (own design). -->
+<!-- Adaptive-icon foreground layer (108 x 108, safe zone r=33 around the centre). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+ <path d="M54.5,33h20a6.5,6.5 0 0 1 6.5,6.5v29a6.5,6.5 0 0 1 -6.5,6.5h-20a6.5,6.5 0 0 1 -6.5,-6.5v-29a6.5,6.5 0 0 1 6.5,-6.5z" fill="none" stroke="#FFFFFF" stroke-width="4.5"/>
+ <path d="M58.5,43.5v20.5l5,-4.6l3.6,7.7l3.8,-1.8l-3.6,-7.6l6.9,-0.2z" fill="#FFB547" stroke="#FFB547" stroke-width="1.6" stroke-linejoin="round"/>
+ <path d="M26,47l6.5,7l-6.5,7" fill="none" stroke="#FFB547" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.5"/>
+ <path d="M34.5,47l6.5,7l-6.5,7" fill="none" stroke="#FFB547" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -59,9 +60,10 @@ fun PreviewDeskflowThemedRoot(
       PreviewAppState { appState ->
         Scaffold(
           snackbarHost = { SnackbarHost(LocalSnackbarHostState.current) },
-        ) {
+        ) { innerPadding ->
           Column(
             modifier = Modifier
+              .padding(innerPadding)
               .fillMaxSize()
               .background(color = MaterialTheme.colorScheme.background)
               .windowInsetsPadding(WindowInsets.Companion.statusBars)

@@ -51,7 +51,8 @@ object AppPrefsSerializer : Serializer<AppPrefs> {
             server = serverConfig {
                 address = SERVER_DEFAULT_ADDRESS
                 port = SERVER_DEFAULT_PORT
-                useTls = false
+                // M9: new installs use TLS (Deskflow servers have it on by default); existing settings are kept.
+                useTls = true
             }
         }
     }

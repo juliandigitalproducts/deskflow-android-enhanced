@@ -40,7 +40,11 @@ fun ConnectionState.copy(
     isConnected: Boolean = this.isConnected,
     ackReceived: Boolean = this.ackReceived,
     isCaptureKeyModeEnabled: Boolean = this.isCaptureKeyModeEnabled,
-    screen: ScreenState = this.screen
+    screen: ScreenState = this.screen,
+    pendingFingerprint: String? = this.pendingFingerprint,
+    pendingServer: String? = this.pendingServer,
+    failureKind: Int = this.failureKind,
+    failedAttempts: Int = this.failedAttempts,
 ): ConnectionState {
     return ConnectionState().apply {
         this.isEnabled = isEnabled
@@ -48,6 +52,11 @@ fun ConnectionState.copy(
         this.ackReceived = ackReceived
         this.isCaptureKeyModeEnabled = isCaptureKeyModeEnabled
         this.screen = screen
+        this.connectionTimestamp = this@copy.connectionTimestamp
+        this.pendingFingerprint = pendingFingerprint
+        this.pendingServer = pendingServer
+        this.failureKind = failureKind
+        this.failedAttempts = failedAttempts
     }
 }
 
@@ -66,7 +75,8 @@ fun ConnectionStateDefaults(context: Context): ConnectionState {
             server = ServerState().apply {
                 address = SERVER_DEFAULT_ADDRESS
                 port = SERVER_DEFAULT_PORT
-                useTls = false
+                useTls = true
+                autoDiscover = true
             }
         }
     }
@@ -102,11 +112,13 @@ fun ScreenState.toServerTarget(): ServerTarget {
 fun ServerState.copy(
     address: String = this.address,
     port: Int = this.port,
-    useTls: Boolean = this.useTls
+    useTls: Boolean = this.useTls,
+    autoDiscover: Boolean = this.autoDiscover
 ): ServerState {
     return ServerState().apply {
         this.address = address
         this.port = port
         this.useTls = useTls
+        this.autoDiscover = autoDiscover
     }
 }

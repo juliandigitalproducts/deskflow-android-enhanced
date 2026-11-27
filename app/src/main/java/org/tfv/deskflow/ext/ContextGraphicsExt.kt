@@ -30,10 +30,19 @@ import org.tfv.deskflow.client.models.SizeF
 
 data class ScreenSize(val px: Size, val dp: SizeF, val scale: Float)
 
+/**
+ * Full size of the default display in its current rotation. A service's displayMetrics can leave out system bars
+ * or keep the size of the last configuration, so the window metrics of the display are used when available.
+ */
 fun Context.getScreenSize(): ScreenSize {
     val dm = resources.displayMetrics
-    val widthPx = dm.widthPixels
-    val heightPx = dm.heightPixels
+    val bounds = runCatching {
+        val display = getSystemService(android.hardware.display.DisplayManager::class.java)
+            .getDisplay(android.view.Display.DEFAULT_DISPLAY)
+        createDisplayContext(display).getSystemService(android.view.WindowManager::class.java).maximumWindowMetrics.bounds
+    }.getOrNull()
+    val widthPx = bounds?.width()?.takeIf { it > 0 } ?: dm.widthPixels
+    val heightPx = bounds?.height()?.takeIf { it > 0 } ?: dm.heightPixels
     val widthDp = widthPx / dm.density
     val heightDp = heightPx / dm.density
     return ScreenSize(Size(widthPx, heightPx), SizeF(widthDp, heightDp), widthPx.toFloat() / widthDp)

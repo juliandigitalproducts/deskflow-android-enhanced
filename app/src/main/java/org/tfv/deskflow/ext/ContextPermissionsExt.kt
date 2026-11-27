@@ -33,7 +33,7 @@ import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
-import android.content.Context.RECEIVER_EXPORTED
+import android.content.Context.RECEIVER_NOT_EXPORTED
 import android.content.Intent
 import android.content.IntentFilter
 import android.provider.Settings
@@ -54,23 +54,6 @@ import org.tfv.deskflow.client.util.AbstractDisposable
 import org.tfv.deskflow.client.util.logging.KLoggingManager
 
 private val log = KLoggingManager.logger("ContextPermissions")
-
-/** Check if draw overlays is enabled for the app */
-fun Context.canDrawOverlays(): Boolean {
-  return Settings.canDrawOverlays(this)
-}
-
-fun Context.requestOverlayPermission() {
-  if (!canDrawOverlays()) {
-    val intent =
-      Intent(
-        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-        "package:${packageName}".toUri(),
-      )
-    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    startActivity(intent)
-  }
-}
 
 fun Context.isAccessibilityServiceEnabled(
   serviceClass: Class<out AccessibilityService>
@@ -166,7 +149,8 @@ fun <T : Service> Context.registerForServiceConnectionEvents(
       }
 
     init {
-      registerReceiver(receiver, filter, RECEIVER_EXPORTED)
+      // App-internal event: other apps must not be able to send it.
+      registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
     }
 
     private fun disposeReceiver() {
@@ -188,14 +172,15 @@ inline fun <reified T : Service> Context.sendServiceConnectionEvent() {
   }
   val intent =
     Intent(SERVICE_CONNECTED_ACTION).apply {
+      setPackage(packageName)
       putExtra("serviceClazz", serviceClazz.java.name)
     }
   sendBroadcast(intent)
 }
 
-const val DESKFLOW_PACKAGE = "org.tfv.deskflow"
-const val DESKFLOW_IME_ID =
-  "$DESKFLOW_PACKAGE/$DESKFLOW_PACKAGE.services.VirtualKeyboardService"
+/** IME id of this app's keyboard; uses the real application id (differs from the code package). */
+val Context.deskflowImeId: String
+  get() = "$packageName/org.tfv.deskflow.services.VirtualKeyboardService"
 
 fun Context.launchInputMethodServiceSettings() {
   val intent =
@@ -229,7 +214,7 @@ fun Context.enabledInputMethodServicesFromSettings(): List<String> {
  *   "com.example.myime/.MyInputMethodService"
  */
 fun Context.isInputMethodServiceEnabledFromSettings(
-  imeId: String = DESKFLOW_IME_ID
+  imeId: String = deskflowImeId
 ): Boolean {
   val enabledIMESettings = enabledInputMethodServicesFromSettings()
   if (!enabledIMESettings.isEmpty())
@@ -251,7 +236,7 @@ fun Context.enabledInputMethodServices(): List<InputMethodInfo> {
 
 /** @param imePackage the package name of your IME, e.g. "com.example.myime" */
 fun Context.isInputMethodServiceEnabled(
-  imePackage: String = DESKFLOW_PACKAGE
+  imePackage: String = packageName
 ): Boolean {
   return catch({
     enabledInputMethodServices().any { it.packageName == imePackage } ||
